@@ -147,12 +147,19 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
     public async Task Demo_analysis_trigger_persists_a_processing_run()
     {
         using var client = factory.CreateClient();
-        var response = await client.PostAsJsonAsync("/api/demo/run-analysis", new DemoRunRequest());
-        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
-        var run = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("completed", run.GetProperty("status").GetString());
-        Assert.Equal(3, run.GetProperty("candidateCount").GetInt32());
+        var firstResponse = await client.PostAsJsonAsync("/api/demo/run-analysis", new DemoRunRequest());
+        Assert.True(firstResponse.IsSuccessStatusCode, await firstResponse.Content.ReadAsStringAsync());
+        var firstRun = await firstResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("completed", firstRun.GetProperty("status").GetString());
+        Assert.Equal(3, firstRun.GetProperty("candidateCount").GetInt32());
+
+        var secondResponse = await client.PostAsJsonAsync("/api/demo/run-analysis", new DemoRunRequest());
+        Assert.True(secondResponse.IsSuccessStatusCode, await secondResponse.Content.ReadAsStringAsync());
+        var secondRun = await secondResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(firstRun.GetProperty("id").GetGuid(), secondRun.GetProperty("id").GetGuid());
+
         var candidates = await client.GetFromJsonAsync<List<CandidateListItem>>("/api/candidates");
+        Assert.Equal(4, candidates!.Count);
         Assert.Contains(candidates!, candidate => candidate.CandidateKey == "PX-DEMO-017" && candidate.Classification == "apparent_motion");
         Assert.Contains(candidates!, candidate => candidate.Classification == "likely_artifact" && candidate.Status == "screened");
         Assert.Contains(candidates!, candidate => candidate.Classification == "uncertain" && candidate.Status == "needs_review");

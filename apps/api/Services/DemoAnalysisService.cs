@@ -20,6 +20,7 @@ public sealed class DemoAnalysisService(ParallaxDbContext db, IScienceServiceCli
         if (request.BackgroundSigma <= 0 || request.BackgroundSigma > 10) throw new ArgumentException("Background sigma must be greater than 0 and no greater than 10.", nameof(request));
 
         var started = DateTime.UtcNow;
+        var requestJson = JsonSerializer.Serialize(request);
         var scienceRequest = new ScienceProcessRequest(request.Dataset, request.Seed, request.BackgroundSigma);
         var analysis = await science.AnalyzeAsync(scienceRequest, cancellationToken);
         if (!string.Equals(analysis.DatasetLabel, "DEMONSTRATION DATASET", StringComparison.Ordinal))
@@ -42,6 +43,20 @@ public sealed class DemoAnalysisService(ParallaxDbContext db, IScienceServiceCli
             db.DatasetSources.Add(source);
         }
 
+        var existingRun = await db.ProcessingRuns
+            .Include(x => x.Candidates)
+            .Where(x => x.DatasetSourceId == source.Id
+                && x.AlgorithmVersion == AlgorithmVersion
+                && x.Status == "completed"
+                && x.ParametersJson == requestJson)
+            .OrderByDescending(x => x.CompletedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (existingRun is not null)
+        {
+            logger.LogInformation("Reusing completed demo processing run {RunId} for the same request", existingRun.Id);
+            return existingRun;
+        }
+
         var region = await db.SkyRegions.SingleOrDefaultAsync(x => x.Name == "Synthetic tangent-plane demo region", cancellationToken);
         if (region is null)
         {
@@ -55,7 +70,7 @@ public sealed class DemoAnalysisService(ParallaxDbContext db, IScienceServiceCli
         {
             Id = Guid.NewGuid(), DatasetSourceId = source.Id, AlgorithmVersion = AlgorithmVersion,
             Status = "completed", StartedAtUtc = started, CompletedAtUtc = DateTime.UtcNow,
-            ParametersJson = JsonSerializer.Serialize(request), ResultJson = JsonSerializer.Serialize(analysis),
+            ParametersJson = requestJson, ResultJson = JsonSerializer.Serialize(analysis),
         };
         db.ProcessingRuns.Add(run);
 
