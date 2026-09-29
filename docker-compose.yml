@@ -32,20 +32,20 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     environment:
-      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_URLS: http://+:5080
       ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=Parallax;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True"
       ScienceService__BaseUrl: http://science:8001/
       PARALLAX_APPLY_MIGRATIONS: "true"
       PARALLAX_CORS_ORIGINS: http://localhost:3000
     ports:
-      - "5080:8080"
+      - "5080:5080"
     depends_on:
       sqlserver:
         condition: service_healthy
       science:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://localhost:8080/health/ready || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:5080/health/ready || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 20
