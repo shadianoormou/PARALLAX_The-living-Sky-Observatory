@@ -192,7 +192,7 @@ function ExplorerHeader({ region, regions, regionId, setRegionId, refresh }: { r
       <div>
         <div className="flex flex-wrap items-center gap-3">
           <span className="eyebrow">01 / Living Sky Observatory</span>
-          <span className="rounded-full border border-[var(--signal)]/30 bg-[var(--signal-soft)] px-2.5 py-1 mono text-[9px] uppercase tracking-[.12em] text-[var(--signal)]">Demonstration dataset</span>
+          <span className="rounded-full border border-[var(--signal)]/30 bg-[var(--signal-soft)] px-2.5 py-1 mono text-[9px] uppercase tracking-[.12em] text-[var(--signal)]">DEMONSTRATION DATASET</span>
         </div>
         <h1 className="mt-3 text-3xl font-medium tracking-[-.055em] text-[var(--ink)] sm:text-4xl">Compare the sky across time.</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">Two registered observations, one evidence trail. Inspect what changed before you decide what it means.</p>
@@ -263,7 +263,7 @@ function ExplorerWorkspace({ region, candidates, records, images, candidateId, s
             </div>
             <div className="flex items-center gap-3 mono text-[9px] uppercase tracking-[.12em] text-[var(--quiet)]"><span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[var(--signal)] shadow-[0_0_8px_var(--signal)]" />{mode === 'blink' ? `Epoch ${epoch}` : mode === 'split' ? 'A / B linked' : layer}</span><span className="text-[var(--line-strong)]">·</span><span>{region.widthPixels} × {region.heightPixels} px</span></div>
           </div>
-          <SkyCanvas images={images} record={record} mode={mode} layer={layer} epoch={epoch} divider={divider} zoom={zoom} pan={pan} setPan={setPan} setZoom={setZoom} setDivider={setDivider} setMode={toggleMode} setPaused={setPaused} setEpoch={setEpoch} paused={paused} showOverlay={showOverlay} />
+          <div key={`${candidateId}-${mode}-${layer}-${epoch}`} className="motion-safe:animate-[stepReveal_.36s_ease-out]"><SkyCanvas images={images} record={record} mode={mode} layer={layer} epoch={epoch} divider={divider} zoom={zoom} pan={pan} setPan={setPan} setZoom={setZoom} setDivider={setDivider} setMode={toggleMode} setPaused={setPaused} setEpoch={setEpoch} paused={paused} showOverlay={showOverlay} /></div>
           <ComparisonControls mode={mode} layer={layer} setLayer={setLayer} epoch={epoch} setEpoch={setEpoch} paused={paused} setPaused={setPaused} speed={speed} setSpeed={setSpeed} reducedMotion={reducedMotion} divider={divider} setDivider={setDivider} />
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-1 mono text-[9px] uppercase tracking-[.1em] text-[var(--quiet)]"><span className="inline-flex items-center gap-2"><Expand size={12} />Keyboard: arrows pan · +/- zoom · B/S/D modes · space pause blink</span><span className="inline-flex items-center gap-2"><Gauge size={12} className="text-[var(--signal)]" />Canvas render · {reducedMotion ? 'reduced motion on' : 'motion enabled'}</span></div>
@@ -479,7 +479,7 @@ function SpectrumPanel({ spectrum }: { spectrum: Spectrum }) {
 }
 
 function LoadingState({ phase }: { phase: string }) {
-  return <div className="panel relative grid min-h-[570px] place-items-center overflow-hidden"><div className="star-field opacity-70" /><div className="relative z-10 text-center"><div className="mx-auto mb-6 grid h-16 w-16 place-items-center rounded-full border border-[var(--signal)]/30 bg-[var(--signal-soft)] text-[var(--signal)]"><LoaderCircle className="animate-spin" size={25} /></div><p className="eyebrow">Observatory sequence</p><h2 className="mt-4 text-2xl font-medium tracking-[-.04em] text-[var(--ink)]">{phase}</h2><p className="mt-3 text-sm text-[var(--muted)]">Retrieving provenance-backed observations and measurements.</p><div className="mx-auto mt-6 h-px w-48 overflow-hidden bg-[var(--line)]"><div className="h-full w-1/3 animate-[pulse_1.2s_ease-in-out_infinite] bg-[var(--signal)]" /></div></div></div>;
+  return <div className="panel relative grid min-h-[570px] place-items-center overflow-hidden"><div className="star-field opacity-70" /><div className="relative z-10 text-center"><div className="mx-auto mb-6 grid h-16 w-16 place-items-center rounded-full border border-[var(--signal)]/30 bg-[var(--signal-soft)] text-[var(--signal)]"><LoaderCircle className="motion-safe:animate-spin" size={25} /></div><p className="eyebrow">Observatory sequence</p><h2 className="mt-4 text-2xl font-medium tracking-[-.04em] text-[var(--ink)]" aria-live="polite">{phase}</h2><p className="mt-3 text-sm text-[var(--muted)]">Retrieving provenance-backed observations and measurements.</p><div className="mx-auto mt-6 h-px w-48 overflow-hidden bg-[var(--line)]"><div className="motion-safe:animate-[pulse_1.2s_ease-in-out_infinite] h-full w-1/3 bg-[var(--signal)]" /></div></div></div>;
 }
 
 function OfflineState({ error, offline, onStart, onRetry }: { error: string | null; offline: boolean; onStart: () => void; onRetry: () => void }) {

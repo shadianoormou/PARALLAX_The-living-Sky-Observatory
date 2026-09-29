@@ -2,7 +2,7 @@
 
 > The sky is not a picture. It is a movie.
 
-PARALLAX is a public-facing scientific exploration platform for comparing repeated sky observations, identifying candidate changes, understanding measurements, and enabling citizen-science review. This repository is currently at **Phase 6: Citizen Science and Provenance**.
+PARALLAX is a public-facing scientific exploration platform for comparing repeated sky observations, identifying candidate changes, understanding measurements, and enabling citizen-science review. This repository is currently at **Phase 7: Motion Design and Cinematic Demo**.
 
 ## Monorepo map
 
@@ -81,7 +81,7 @@ python3 -m compileall services/science
 .venv/bin/python services/science/generate_demo_assets.py
 ```
 
-Phase 6 preserves the API-backed explorer and candidate investigation flow, then adds classification persistence, optional LOW/MEDIUM/HIGH confidence, vote-gated community consensus, a Discovery Passport, restrained achievements, learning-module audit events, and candidate-level provenance. Screened artifact and uncertain cases remain visible with honest statuses instead of being promoted or assigned unsupported probabilities. It does not claim a NASA discovery, connect to a fake live feed, or infer Planet X. Generated assets are development evidence for validating the pipeline and are labeled **DEMONSTRATION DATASET**.
+Phase 7 preserves the Phase 6 evidence and review model, then adds a fast skippable cinematic intro, a presenter-controlled real demo investigation, meaningful epoch/candidate transitions, reduced-motion handling, responsive focus polish, and a projector-ready three-minute presentation flow. The preset demo record is `PX-DEMO-017` and remains labeled **DEMONSTRATION CANDIDATE** / **DEMONSTRATION DATASET**. It does not claim a NASA discovery, connect to a fake live feed, or infer Planet X. Generated assets are development evidence for validating the pipeline.
 
 ## Product guardrails
 
@@ -91,4 +91,4 @@ Phase 6 preserves the API-backed explorer and candidate investigation flow, then
 - The science service is the only place where image registration, difference imaging, and candidate detection are performed.
 - Ground truth exists only beside the generator for test evaluation; processing endpoints never receive it.
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md), [SETUP.md](./SETUP.md), [SCIENCE.md](./SCIENCE.md), [DATA_PROVENANCE.md](./DATA_PROVENANCE.md), and [DEMO_SCRIPT.md](./DEMO_SCRIPT.md) for the Phase 6 operating notes.
+See [ARCHITECTURE.md](./ARCHITECTURE.md), [SETUP.md](./SETUP.md), [SCIENCE.md](./SCIENCE.md), [DATA_PROVENANCE.md](./DATA_PROVENANCE.md), and [DEMO_SCRIPT.md](./DEMO_SCRIPT.md) for the Phase 7 operating notes.

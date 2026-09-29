@@ -151,6 +151,7 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
         Assert.Equal("completed", run.GetProperty("status").GetString());
         Assert.Equal(3, run.GetProperty("candidateCount").GetInt32());
         var candidates = await client.GetFromJsonAsync<List<CandidateListItem>>("/api/candidates");
+        Assert.Contains(candidates!, candidate => candidate.CandidateKey == "PX-DEMO-017" && candidate.Classification == "apparent_motion");
         Assert.Contains(candidates!, candidate => candidate.Classification == "likely_artifact" && candidate.Status == "screened");
         Assert.Contains(candidates!, candidate => candidate.Classification == "uncertain" && candidate.Status == "needs_review");
     }

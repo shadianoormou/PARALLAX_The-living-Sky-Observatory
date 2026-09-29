@@ -62,7 +62,7 @@ public sealed class DemoAnalysisService(ParallaxDbContext db, IScienceServiceCli
             var candidate = new Candidate
             {
                 Id = Guid.NewGuid(), ProcessingRunId = run.Id, SkyRegionId = region.Id,
-                CandidateKey = scienceCandidate.CandidateId, Classification = scienceCandidate.Classification,
+                CandidateKey = DisplayCandidateKey(scienceCandidate.CandidateId, scienceCandidate.Classification), Classification = scienceCandidate.Classification,
                 Interpretation = scienceCandidate.Interpretation, Status = "candidate", CreatedAtUtc = DateTime.UtcNow,
             };
             db.Candidates.Add(candidate);
@@ -130,6 +130,7 @@ public sealed class DemoAnalysisService(ParallaxDbContext db, IScienceServiceCli
     }
 
     private static string? InferUnit(string key) => key.Contains("arcsec", StringComparison.OrdinalIgnoreCase) ? "arcsec" : key.Contains("pixels", StringComparison.OrdinalIgnoreCase) ? "pixels" : null;
+    private static string DisplayCandidateKey(string scienceCandidateId, string classification) => classification == "apparent_motion" ? "PX-DEMO-017" : scienceCandidateId;
     private static JsonElement GetObject(Dictionary<string, JsonElement> values, string key) => values.TryGetValue(key, out var value) ? value : throw new InvalidOperationException($"Science response did not contain epoch {key}.");
     private static string? GetString(JsonElement value, string key) => value.TryGetProperty(key, out var property) && property.ValueKind == JsonValueKind.String ? property.GetString() : null;
     private static double GetDouble(JsonElement value, string key) => value.TryGetProperty(key, out var property) && property.TryGetDouble(out var number) ? number : 0;

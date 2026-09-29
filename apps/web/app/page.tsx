@@ -2,16 +2,41 @@
 
 import Link from 'next/link';
 import { ArrowDown, ArrowUpRight, Pause, Play } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
+const introCopy = ['1,000,000,000+ objects.', 'Some of them changed.', 'The sky is not a picture.', 'IT IS A MOVIE.'];
 
 export default function HomePage() {
   const [introVisible, setIntroVisible] = useState(true);
+  const [introStep, setIntroStep] = useState(0);
+  const [reducedMotion, setReducedMotion] = useState(false);
   const [playing, setPlaying] = useState(true);
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => {
+      setReducedMotion(media.matches);
+      if (media.matches) setIntroVisible(false);
+    };
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+
+  useEffect(() => {
+    if (!introVisible || reducedMotion) return;
+    const timer = window.setTimeout(() => {
+      if (introStep >= introCopy.length - 1) setIntroVisible(false);
+      else setIntroStep((step) => step + 1);
+    }, 620);
+    return () => window.clearTimeout(timer);
+  }, [introStep, introVisible, reducedMotion]);
 
   return (
     <section className="hero-glow relative min-h-[calc(100vh-72px)] overflow-hidden bg-[var(--void)]">
       <div className="star-field" aria-hidden="true" />
       <div className="observatory-grid absolute inset-0 opacity-50" aria-hidden="true" />
+      {introVisible && <div className="absolute inset-0 z-30 grid place-items-center bg-[rgba(8,11,13,.94)] px-6" role="status" aria-live="polite"><div className="text-center"><p className="eyebrow mb-6">PARALLAX / LIVING SKY OBSERVATORY</p><p key={introStep} className="demo-step-enter max-w-5xl text-[clamp(2.2rem,7vw,7.5rem)] font-medium leading-[.92] tracking-[-.07em] text-[var(--ink)]">{introCopy[introStep]}</p><button type="button" onClick={() => setIntroVisible(false)} className="focus-ring mt-10 border border-[var(--line-strong)] px-4 py-2.5 mono text-[10px] uppercase tracking-[.14em] text-[var(--muted)] hover:text-[var(--signal)]">Skip intro</button></div></div>}
       <div className="absolute left-[7%] top-[21%] h-48 w-48 rounded-full border border-[rgba(141,229,226,.16)] sm:h-72 sm:w-72" aria-hidden="true" />
       <div className="absolute left-[12%] top-[28%] h-32 w-32 rounded-full border border-[rgba(200,255,107,.12)] sm:h-48 sm:w-48" aria-hidden="true" />
       <div className="absolute right-[8%] top-[18%] hidden h-px w-40 bg-[var(--line-strong)] sm:block" aria-hidden="true" />
@@ -32,7 +57,7 @@ export default function HomePage() {
           </h1>
           <div className="mt-12 flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-8">
             <Link href="/explore" className="focus-ring inline-flex w-fit items-center gap-3 rounded-full bg-[var(--signal)] px-6 py-4 mono text-[10px] font-medium uppercase tracking-[.15em] text-[var(--void)] transition-transform hover:-translate-y-1">
-              Enter the living sky <ArrowUpRight size={15} />
+              Explore the living sky <ArrowUpRight size={15} />
             </Link>
             <Link href="/architecture" className="focus-ring inline-flex w-fit items-center gap-2 mono text-[10px] uppercase tracking-[.15em] text-[var(--muted)] hover:text-[var(--ink)]">
               How PARALLAX works <ArrowUpRight size={14} />
@@ -53,7 +78,7 @@ export default function HomePage() {
           </div>
         </div>
       </div>
-      {introVisible && <span className="sr-only">Intro active. Skip intro is available above.</span>}
+      {introVisible && <span className="sr-only">Cinematic intro active. Skip intro is available.</span>}
     </section>
   );
 }
