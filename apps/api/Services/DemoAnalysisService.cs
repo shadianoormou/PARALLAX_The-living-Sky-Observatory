@@ -16,6 +16,8 @@ public sealed class DemoAnalysisService(ParallaxDbContext db, IScienceServiceCli
         {
             throw new ArgumentException("Only the explicitly labeled synthetic-demo dataset is available.", nameof(request));
         }
+        if (request.Seed < 0) throw new ArgumentException("Seed must be non-negative.", nameof(request));
+        if (request.BackgroundSigma <= 0 || request.BackgroundSigma > 10) throw new ArgumentException("Background sigma must be greater than 0 and no greater than 10.", nameof(request));
 
         var started = DateTime.UtcNow;
         var scienceRequest = new ScienceProcessRequest(request.Dataset, request.Seed, request.BackgroundSigma);

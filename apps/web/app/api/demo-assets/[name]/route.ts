@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { NextResponse } from 'next/server';
 
-const allowedAssets = new Set(['epoch-a.pgm', 'epoch-b.pgm', 'registered.pgm', 'difference.pgm', 'residual.pgm']);
+const allowedAssets = new Set(['epoch-a.pgm', 'epoch-b.pgm', 'registered.pgm', 'difference.pgm', 'residual.pgm', 'candidate-overlay.pgm', 'summary.json']);
 
 export async function GET(_: Request, { params }: { params: Promise<{ name: string }> }) {
   const { name } = await params;
@@ -14,7 +14,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ name: stri
     return new NextResponse(asset, {
       headers: {
         'Cache-Control': 'public, max-age=3600, immutable',
-        'Content-Type': 'application/octet-stream',
+        'Content-Type': name.endsWith('.json') ? 'application/json' : 'application/octet-stream',
       },
     });
   } catch {

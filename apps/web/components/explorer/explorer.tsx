@@ -11,6 +11,7 @@ import {
   CandidateDetail, CandidateListItem, Measurement, ParallaxApiError,
   Provenance, Region, Spectrum, getArray, getNumber, parallaxApi,
 } from '../../lib/parallax-api';
+import { loadPrecomputedDemo } from '../../lib/demo-fallback';
 
 type ComparisonMode = 'blink' | 'split' | 'difference';
 type DifferenceLayer = 'original' | 'registered' | 'difference' | 'residual';
@@ -89,6 +90,7 @@ export function Explorer() {
   const [loadingPhase, setLoadingPhase] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
+  const [precomputed, setPrecomputed] = useState(false);
 
   const loadAssets = useCallback(async () => {
     const entries = await Promise.all(
@@ -115,6 +117,7 @@ export function Explorer() {
     setBusy(true);
     setError(null);
     setOffline(false);
+    setPrecomputed(false);
     try {
       const [nextRegions, nextCandidates, nextImages] = await Promise.all([
         parallaxApi.listRegions(),
@@ -124,22 +127,46 @@ export function Explorer() {
       setRegions(nextRegions);
       setCandidates(nextCandidates);
       setImages(nextImages);
-      if (nextRegions.length) setRegionId((current) => current || nextRegions[0].id);
-      if (nextCandidates.length) setCandidateId((current) => current || requestedCandidateId || nextCandidates[0].id);
-      const entries = await Promise.all(nextCandidates.map(async (candidate) => [candidate.id, await loadCandidate(candidate)] as const));
-      setRecords(Object.fromEntries(entries));
+      const initialCandidate = nextCandidates.find((candidate) => candidate.id === requestedCandidateId) ?? nextCandidates[0];
+      if (nextRegions.length) setRegionId(nextRegions[0].id);
+      setCandidateId(initialCandidate?.id ?? '');
+      setRecords({});
+      if (initialCandidate) setRecords({ [initialCandidate.id]: await loadCandidate(initialCandidate) });
     } catch (caught) {
       const message = caught instanceof ParallaxApiError
         ? caught.message
         : caught instanceof Error ? caught.message : 'The observatory could not load this field.';
-      setError(message);
-      setOffline(caught instanceof TypeError || (caught instanceof ParallaxApiError && caught.status >= 500));
+      try {
+        const fallback = await loadPrecomputedDemo();
+        setRegions([fallback.region]);
+        setCandidates(fallback.candidates);
+        setRecords(fallback.records);
+        setImages(await loadAssets());
+        setRegionId(fallback.region.id);
+        const initialFallback = fallback.candidates.find((candidate) => candidate.id === requestedCandidateId) ?? fallback.candidates[0];
+        setCandidateId(initialFallback?.id ?? '');
+        setPrecomputed(true);
+        setOffline(true);
+        setError(`API unavailable: showing the read-only precomputed demonstration artifact. (${message})`);
+      } catch {
+        setError(message);
+        setOffline(caught instanceof TypeError || (caught instanceof ParallaxApiError && caught.status >= 500));
+      }
     } finally {
       setBusy(false);
     }
   }, [loadAssets, loadCandidate, requestedCandidateId]);
 
   useEffect(() => { void loadObservatory(); }, [loadObservatory]);
+
+  useEffect(() => {
+    if (!candidateId || precomputed || records[candidateId]) return;
+    const candidate = candidates.find((item) => item.id === candidateId);
+    if (!candidate) return;
+    void loadCandidate(candidate).then((record) => setRecords((current) => ({ ...current, [candidate.id]: record }))).catch((caught) => {
+      setError(caught instanceof Error ? caught.message : 'The selected candidate record could not be loaded.');
+    });
+  }, [candidateId, candidates, loadCandidate, precomputed, records]);
 
   useEffect(() => {
     if (!busy) return;
@@ -155,9 +182,23 @@ export function Explorer() {
       await parallaxApi.runDemo();
       await loadObservatory();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'The demonstration analysis could not be started.');
-      setOffline(caught instanceof TypeError || (caught instanceof ParallaxApiError && caught.status >= 500));
-      setBusy(false);
+      try {
+        const fallback = await loadPrecomputedDemo();
+        setRegions([fallback.region]);
+        setCandidates(fallback.candidates);
+        setRecords(fallback.records);
+        setImages(await loadAssets());
+        setRegionId(fallback.region.id);
+        setCandidateId(fallback.candidates[0]?.id ?? '');
+        setPrecomputed(true);
+        setOffline(true);
+        setError('Live services are unavailable; loaded the read-only precomputed demonstration artifact.');
+      } catch {
+        setError(caught instanceof Error ? caught.message : 'The demonstration analysis could not be started.');
+        setOffline(caught instanceof TypeError || (caught instanceof ParallaxApiError && caught.status >= 500));
+      } finally {
+        setBusy(false);
+      }
     }
   };
 
@@ -179,6 +220,7 @@ export function Explorer() {
             candidateId={candidateId}
             setCandidateId={setCandidateId}
             expert={expert}
+            precomputed={precomputed}
           />
         )}
       </div>
@@ -212,7 +254,7 @@ function ExplorerHeader({ region, regions, regionId, setRegionId, refresh }: { r
   );
 }
 
-function ExplorerWorkspace({ region, candidates, records, images, candidateId, setCandidateId, expert }: { region: Region; candidates: CandidateListItem[]; records: Record<string, CandidateRecord>; images: Partial<Record<keyof typeof ASSETS, PgmImage>>; candidateId: string; setCandidateId: (value: string) => void; expert: boolean }) {
+function ExplorerWorkspace({ region, candidates, records, images, candidateId, setCandidateId, expert, precomputed }: { region: Region; candidates: CandidateListItem[]; records: Record<string, CandidateRecord>; images: Partial<Record<keyof typeof ASSETS, PgmImage>>; candidateId: string; setCandidateId: (value: string) => void; expert: boolean; precomputed: boolean }) {
   const [mode, setMode] = useState<ComparisonMode>('blink');
   const [layer, setLayer] = useState<DifferenceLayer>('difference');
   const [epoch, setEpoch] = useState<EpochCode>('A');
@@ -252,6 +294,7 @@ function ExplorerWorkspace({ region, candidates, records, images, candidateId, s
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
       <section className="min-w-0">
+        {precomputed && <div className="mb-3 border border-[var(--amber)]/40 bg-[rgba(243,187,113,.08)] px-4 py-3 text-xs leading-5 text-[var(--amber)]" role="status">Read-only fallback: this field is rendered from the checked-in precomputed DEMONSTRATION DATASET. Live persistence and voting are unavailable until the API returns.</div>}
         <div className="panel overflow-hidden">
           <div className="flex flex-col gap-3 border-b border-[var(--line)] bg-[rgba(14,20,23,.72)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div className="flex flex-wrap items-center gap-2">

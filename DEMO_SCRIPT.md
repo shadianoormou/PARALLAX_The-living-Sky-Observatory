@@ -1,4 +1,4 @@
-# Phase 7 / three-minute presentation script
+# Phase 8 / three-minute presentation script
 
 Preparation: start SQL Server, the API, the science service, and the web app using [SETUP.md](./SETUP.md). If the database is clean, the guided route below creates its own labeled demonstration run; no manual seed step is required.
 
@@ -11,6 +11,6 @@ Preparation: start SQL Server, the API, the science service, and the web app usi
 7. **02:20–02:45 / Human review** — In **CLASSIFY THE CANDIDATE**, choose MOVING SOURCE, optionally choose confidence, and submit. Consensus is hidden until the vote, then appears as community opinion with reviewer count—not scientific truth.
 8. **02:45–03:00 / Provenance** — Finish at **TRACE PROVENANCE**. Show candidate → processing run → dataset source, epoch IDs, algorithm version, generated date, and the honest synthetic source label. If more time is available, open `/provenance` and `/passport`.
 
-Rehearsal checklist: test with keyboard and visible focus, resize to 1366×768 and a narrow mobile viewport, toggle `prefers-reduced-motion`, and confirm there are no dead buttons or placeholder claims. Run `pnpm test`, `pnpm lint:web`, `pnpm build:web`, `pnpm test:explanations`, `.venv/bin/pytest -q tests/science`, and `dotnet test tests/api/Parallax.Api.Tests.csproj` before presentation.
+Rehearsal checklist: test with keyboard and visible focus, resize to 1366×768 and a narrow mobile viewport, toggle `prefers-reduced-motion`, and confirm there are no dead buttons or placeholder claims. Run `pnpm test`, `pnpm lint:web`, `pnpm test:release`, `pnpm build:web`, `pnpm test:explanations`, `.venv/bin/pytest -q tests/science`, and `dotnet test tests/api/Parallax.Api.Tests.csproj` before presentation.
 
-Phase 7 rehearsal notes: the landing and presenter layout were checked in the local browser at a narrow viewport, including the skippable intro and the API-unavailable boundary. The only unresolved local friction is environmental: Docker/SQL Server is not installed on the rehearsal machine, so the live API-backed ten-step run could not be clicked through there. The real pipeline path is covered by the API integration tests; start SQL Server and the services from [SETUP.md](./SETUP.md) for the full browser rehearsal.
+Release rehearsal notes: the landing and presenter layout were checked in the local browser at a narrow viewport, including the skippable intro, reduced-motion boundary, and API-unavailable boundary. The precomputed fallback keeps the field explorable without pretending to persist a vote. Start the Docker stack from [SETUP.md](./SETUP.md) for the full API-backed browser rehearsal.

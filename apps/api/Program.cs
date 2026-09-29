@@ -32,9 +32,22 @@ app.UseCors();
 app.UseSwagger();
 app.UseSwaggerUI();
 
+if (builder.Configuration.GetValue<bool>("PARALLAX_APPLY_MIGRATIONS"))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var db = scope.ServiceProvider.GetRequiredService<ParallaxDbContext>();
+    await db.Database.MigrateAsync();
+}
+
 app.MapGet("/health", () => Results.Ok(new { service = "parallax-api", status = "ok", phase = "persistence-and-integration" }));
 app.MapGet("/api/v1/health", () => Results.Ok(new { service = "parallax-api", status = "ok", phase = "persistence-and-integration" }));
-app.MapHealthChecks("/health/ready");
+app.MapGet("/health/ready", async (ParallaxDbContext db, CancellationToken cancellationToken) =>
+{
+    var reachable = await db.Database.CanConnectAsync(cancellationToken);
+    return reachable
+        ? Results.Ok(new { service = "parallax-api", status = "ready" })
+        : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+});
 app.MapParallaxEndpoints();
 
 app.Run();

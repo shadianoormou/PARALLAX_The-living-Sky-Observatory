@@ -1,6 +1,47 @@
 {
   "dataset_label": "DEMONSTRATION DATASET",
   "seed": 2026,
+  "generated_at_utc": "2026-09-29T00:00:00Z",
+  "epochs": {
+    "a": {
+      "dataset_label": "DEMONSTRATION DATASET",
+      "dataset_id": "parallax-synthetic-v1",
+      "generated_seed": 2026,
+      "shape": [
+        128,
+        128
+      ],
+      "coordinate_frame": "synthetic tangent-plane pixels",
+      "pixel_scale_arcsec": 0.4,
+      "bands": [
+        "S1",
+        "S2",
+        "S3"
+      ],
+      "provenance_status": "synthetic, deterministic, not an astronomical archive observation",
+      "epoch": "A",
+      "observation_id": "synthetic-epoch-a"
+    },
+    "b": {
+      "dataset_label": "DEMONSTRATION DATASET",
+      "dataset_id": "parallax-synthetic-v1",
+      "generated_seed": 2026,
+      "shape": [
+        128,
+        128
+      ],
+      "coordinate_frame": "synthetic tangent-plane pixels",
+      "pixel_scale_arcsec": 0.4,
+      "bands": [
+        "S1",
+        "S2",
+        "S3"
+      ],
+      "provenance_status": "synthetic, deterministic, not an astronomical archive observation",
+      "epoch": "B",
+      "observation_id": "synthetic-epoch-b"
+    }
+  },
   "candidate_count": 2,
   "candidates": [
     {
@@ -104,5 +145,104 @@
     "mean": 0.03967256098985672,
     "rms": 1.5808368921279907,
     "noise_sigma": 1.323479700280294
-  }
+  },
+  "spectral_comparison": [
+    {
+      "source_id": "moving-source",
+      "wavelength_um": [
+        1.2000000476837158,
+        1.7999999523162842,
+        2.4000000953674316,
+        3.0,
+        3.5999999046325684
+      ],
+      "flux_epoch_a": [
+        0.7,
+        0.92,
+        1.12,
+        0.91,
+        0.62
+      ],
+      "flux_epoch_b": [
+        0.7,
+        0.92,
+        1.12,
+        0.91,
+        0.62
+      ],
+      "delta_flux": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "interpretation": "spectral sample comparison only; no physical classification is assigned"
+    },
+    {
+      "source_id": "stable-reference",
+      "wavelength_um": [
+        1.2000000476837158,
+        1.7999999523162842,
+        2.4000000953674316,
+        3.0,
+        3.5999999046325684
+      ],
+      "flux_epoch_a": [
+        0.84,
+        0.88,
+        0.86,
+        0.8,
+        0.72
+      ],
+      "flux_epoch_b": [
+        0.84,
+        0.88,
+        0.86,
+        0.8,
+        0.72
+      ],
+      "delta_flux": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "interpretation": "spectral sample comparison only; no physical classification is assigned"
+    },
+    {
+      "source_id": "variable-source",
+      "wavelength_um": [
+        1.2000000476837158,
+        1.7999999523162842,
+        2.4000000953674316,
+        3.0,
+        3.5999999046325684
+      ],
+      "flux_epoch_a": [
+        0.42,
+        0.66,
+        0.98,
+        1.24,
+        1.1
+      ],
+      "flux_epoch_b": [
+        0.98,
+        1.54,
+        2.286667,
+        2.893333,
+        2.566667
+      ],
+      "delta_flux": [
+        0.56,
+        0.88,
+        1.306667,
+        1.653333,
+        1.466667
+      ],
+      "interpretation": "spectral sample comparison only; no physical classification is assigned"
+    }
+  ],
+  "provenance_statement": "Synthetic, deterministic, precomputed demonstration artifact; not an astronomical archive observation."
 }

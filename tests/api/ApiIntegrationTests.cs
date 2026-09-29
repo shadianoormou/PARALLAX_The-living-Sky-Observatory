@@ -41,7 +41,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     private static void Seed(ParallaxDbContext db)
     {
         var source = new DatasetSource { Id = Guid.NewGuid(), Name = "Demo source", DatasetType = "synthetic-demo", Label = "DEMONSTRATION DATASET", SourceIdentifier = "seed-source", CreatedAtUtc = DateTime.UtcNow };
-        var run = new ProcessingRun { Id = Guid.NewGuid(), DatasetSource = source, AlgorithmVersion = "test", Status = "completed", StartedAtUtc = DateTime.UtcNow, CompletedAtUtc = DateTime.UtcNow, ParametersJson = "{}", ResultJson = "{\"epochs\":{\"a\":{},\"b\":{}}}" };
+        var run = new ProcessingRun { Id = Guid.NewGuid(), DatasetSource = source, AlgorithmVersion = "test", Status = "completed", StartedAtUtc = DateTime.UtcNow, CompletedAtUtc = DateTime.UtcNow, ParametersJson = "{}", ResultJson = "{\"epochs\":{\"a\":{\"epoch\":\"A\"},\"b\":{\"epoch\":\"B\"}}}" };
         var candidate = new Candidate { Id = Guid.NewGuid(), ProcessingRun = run, CandidateKey = "motion-001", Classification = "apparent_motion", Interpretation = "possible apparent motion; requires additional verification", Status = "candidate", CreatedAtUtc = DateTime.UtcNow };
         candidate.Measurements.Add(new CandidateMeasurement { Id = Guid.NewGuid(), Candidate = candidate, MetricName = "measurement.displacement_pixels_xy", MetadataJson = "[4.5,-3.2]" });
         db.Add(candidate);
@@ -102,6 +102,8 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
         Assert.Contains(measurements!, measurement => measurement.MetricName.Contains("displacement", StringComparison.Ordinal));
         Assert.Empty(spectrum!);
         Assert.Equal("seed-source", provenance!.SourceIdentifier);
+        Assert.Equal("A", provenance.EpochA.GetProperty("epoch").GetString());
+        Assert.Equal("B", provenance.EpochB.GetProperty("epoch").GetString());
     }
 
     [Fact]
@@ -162,5 +164,13 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
         using var client = factory.CreateClient();
         var response = await client.GetAsync("/swagger/v1/swagger.json");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Classification_rejects_unknown_confidence_without_persisting_it()
+    {
+        using var client = factory.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/classifications", new ClassificationRequest(factory.CandidateId, "uncertain", Confidence: "certain"));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 }

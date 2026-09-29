@@ -12,6 +12,7 @@ Open http://localhost:3000/explore. Build and type-check with `pnpm build:web` a
 ## API
 
 ```bash
+export ConnectionStrings__DefaultConnection='Server=localhost,1433;Database=Parallax;User Id=sa;Password=YOUR_LOCAL_PASSWORD;TrustServerCertificate=True'
 dotnet run --project apps/api/Parallax.Api.csproj
 curl http://localhost:5080/health
 ```
@@ -27,6 +28,10 @@ dotnet tool run dotnet-ef database update --project apps/api/Parallax.Api.csproj
 ```
 
 The migrations are in `apps/api/Migrations/`, including `AddClassificationConfidence`. The local API uses SQL Server from `ConnectionStrings:DefaultConnection`; tests replace it with an in-memory SQLite connection.
+
+For a controlled startup migration, set `PARALLAX_APPLY_MIGRATIONS=true`. The API then runs `Database.MigrateAsync()` before listening. It is disabled by default in local development so migration ownership stays explicit; Compose enables it after the SQL Server health check passes.
+
+The safe recovery sequence is: stop the API, verify the database volume is present, run `dotnet tool run dotnet-ef database update ...`, restart the API, and inspect `/health/ready`. Never delete the volume as a first recovery step.
 
 ## Science service
 
@@ -70,6 +75,8 @@ docker compose ps
 ```
 
 The explorer, Sky Mysteries queue, citizen-science review, passport, and provenance pages require the API and the persisted demonstration run. If either service is unavailable, they show explicit offline states and do not render placeholder science. Configure a different API origin with `NEXT_PUBLIC_API_BASE_URL` in `.env.local`.
+
+The explorer and guided demo additionally load a checked-in precomputed artifact when the API or science service is unavailable. This is read-only: no live analysis, classification, or consensus is fabricated.
 
 Open `/candidates` for the filtered queue and `/candidates/{id}` for the evidence-first investigation route. The detail route provides deterministic explainability, spectral blink, provenance, and Expert Mode metadata export.
 

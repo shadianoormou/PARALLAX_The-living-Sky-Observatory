@@ -3,8 +3,9 @@ from __future__ import annotations
 from dataclasses import replace
 
 import numpy as np
+import pytest
 
-from services.science.app.pipeline import analyze_observations, detect_candidates, register_observations, screen_candidates
+from services.science.app.pipeline import ObservationValidationError, analyze_observations, detect_candidates, difference_observations, register_observations, screen_candidates
 from services.science.app.synthetic import generate_synthetic_dataset
 
 
@@ -40,6 +41,21 @@ def test_known_brightness_change_is_detected() -> None:
     variable = [candidate for candidate in candidates if candidate["classification"] == "brightness_change"]
     assert variable
     assert max(candidate["measurement"]["relative_change"] for candidate in variable) > 0.4
+
+
+def test_registration_rejects_bad_pairs_before_science_processing() -> None:
+    dataset = generate_synthetic_dataset()
+    malformed = replace(dataset.epoch_b, image=dataset.epoch_b.image[:-1])
+    with pytest.raises(ObservationValidationError, match="dimensions must match"):
+        difference_observations(dataset.epoch_a, malformed)
+
+
+def test_spectral_comparison_preserves_measurements_without_physical_labels() -> None:
+    dataset = generate_synthetic_dataset()
+    analysis = analyze_observations(dataset.epoch_a, dataset.epoch_b)
+    moving = next(item for item in analysis["spectral_comparison"] if item["source_id"] == "moving-source")
+    assert len(moving["wavelength_um"]) == len(moving["flux_epoch_a"]) == len(moving["flux_epoch_b"])
+    assert "classification" not in moving
 
 
 def test_identical_epochs_do_not_create_candidates() -> None:

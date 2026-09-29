@@ -9,6 +9,8 @@ namespace Parallax.Api;
 
 public static class EndpointMappings
 {
+    private static readonly SemaphoreSlim DemoAnalysisGate = new(1, 1);
+
     public static void MapParallaxEndpoints(this WebApplication app)
     {
         app.MapGet("/api/regions", async (ParallaxDbContext db, CancellationToken cancellationToken) =>
@@ -126,8 +128,20 @@ public static class EndpointMappings
 
         app.MapPost("/api/demo/run-analysis", async (DemoRunRequest body, DemoAnalysisService demo, CancellationToken cancellationToken) =>
         {
-            var run = await demo.RunAsync(body, cancellationToken);
-            return Results.Ok(new { run.Id, run.Status, run.AlgorithmVersion, run.StartedAtUtc, run.CompletedAtUtc, CandidateCount = run.Candidates.Count });
+            if (!await DemoAnalysisGate.WaitAsync(0, cancellationToken))
+            {
+                return Results.Problem("A demonstration analysis is already running. Try again shortly.", statusCode: StatusCodes.Status429TooManyRequests, title: "Analysis busy");
+            }
+
+            try
+            {
+                var run = await demo.RunAsync(body, cancellationToken);
+                return Results.Ok(new { run.Id, run.Status, run.AlgorithmVersion, run.StartedAtUtc, run.CompletedAtUtc, CandidateCount = run.Candidates.Count });
+            }
+            finally
+            {
+                DemoAnalysisGate.Release();
+            }
         });
     }
 

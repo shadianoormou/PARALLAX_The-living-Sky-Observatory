@@ -2,7 +2,7 @@
 
 > The sky is not a picture. It is a movie.
 
-PARALLAX is a public-facing scientific exploration platform for comparing repeated sky observations, identifying candidate changes, understanding measurements, and enabling citizen-science review. This repository is currently at **Phase 7: Motion Design and Cinematic Demo**.
+PARALLAX is a public-facing scientific exploration platform for comparing repeated sky observations, identifying candidate changes, understanding measurements, and enabling citizen-science review. This repository is at **Phase 8: Release Finalization**.
 
 ## Monorepo map
 
@@ -24,7 +24,7 @@ tests/science         FastAPI scientific engine tests
 - Node.js 20.11+ and pnpm 9+
 - .NET SDK 10+ (the API targets the runtime available in this workspace)
 - Python 3.11+
-- Optional: Docker Desktop for the local SQL Server container
+- Docker Desktop 4.x+ for the one-command stack, or the local runtimes above for service-by-service development
 
 ## Exact local run commands
 
@@ -66,7 +66,33 @@ dotnet tool restore
 pnpm migrate:api
 ```
 
+## One-command Docker startup
+
+Docker Compose starts SQL Server, applies pending EF migrations once the database is healthy, starts the science service and API, then serves the web app:
+
+```bash
+cp .env.example .env
+# edit .env and replace MSSQL_SA_PASSWORD with a strong local password
+docker compose up --build
+```
+
+Open http://localhost:3000. Stop with `Ctrl-C`; remove only the local database volume with `docker compose down -v` when you intentionally want a clean database.
+
+If Docker is unavailable, `/explore` and `/demo` fall back to the checked-in, read-only precomputed artifact in `data/demo/`. That fallback is clearly labeled and cannot pretend to persist classifications or community consensus.
+
 The API Swagger UI is at http://localhost:5080/swagger. Open `/explore` and choose **Load demonstration field**; the API calls FastAPI, stores the returned metadata, measurements, spectra, and screened review items, and exposes them through the candidate endpoints. `/candidates` is the Sky Mysteries queue and `/candidates/{id}` is the evidence-first investigation route. `/citizen-science` is the vote-gated review flow, `/passport` reads persisted participation metrics, and `/provenance` exposes the source-to-processing ledger.
+
+## Why this challenge matters
+
+Time-domain astronomy is about change: repeated observations can reveal movement, fading, brightening, or a detector artifact that a single image cannot explain. PARALLAX makes that reasoning legible to a public reviewer while keeping measured evidence, provisional interpretation, human classification, and provenance separate.
+
+## Architecture and features
+
+The web app calls an ASP.NET API. The API validates requests, calls the FastAPI science engine, persists datasets, observation epochs, processing runs, measurements, spectra, classifications, consensus, and audit events in SQL Server, and exposes a provenance trail. The web experience adds blink, split, difference and residual views, candidate selection, Public/Expert mode, spectral blink, guided demo narration, vote-gated consensus, responsive layouts, and reduced-motion handling.
+
+## Science, provenance, and boundaries
+
+The science service registers two 2D observations, estimates a translation, normalizes photometry, computes a difference image, extracts measured candidate changes, and screens artifacts/low-SNR residuals. The deterministic synthetic source is intentionally labeled and the generator-only ground truth never enters processing responses. See [SCIENCE.md](./SCIENCE.md) and [DATA_PROVENANCE.md](./DATA_PROVENANCE.md).
 
 ## Verification
 
@@ -81,7 +107,19 @@ python3 -m compileall services/science
 .venv/bin/python services/science/generate_demo_assets.py
 ```
 
-Phase 7 preserves the Phase 6 evidence and review model, then adds a fast skippable cinematic intro, a presenter-controlled real demo investigation, meaningful epoch/candidate transitions, reduced-motion handling, responsive focus polish, and a projector-ready three-minute presentation flow. The preset demo record is `PX-DEMO-017` and remains labeled **DEMONSTRATION CANDIDATE** / **DEMONSTRATION DATASET**. It does not claim a NASA discovery, connect to a fake live feed, or infer Planet X. Generated assets are development evidence for validating the pipeline.
+Phase 8 hardens the evidence model for release: science validation covers registration, known changes, false-positive boundaries, artifacts, and noise; the API persists provenance, spectra, classifications, and consensus; the web app supports blink/split/difference, Public/Expert mode, spectral comparison, guided demo review, and an explicit precomputed fallback. The preset demo record is `PX-DEMO-017` and remains labeled **DEMONSTRATION CANDIDATE** / **DEMONSTRATION DATASET**. It does not claim a NASA discovery, connect to a fake live feed, or infer Planet X. Generated assets are validation evidence, not an astronomical archive observation.
+
+## Limitations and future work
+
+This release uses a synthetic 128×128 validation field, a single-flight API guard rather than a full production quota system, and manual screenshot/E2E rehearsal rather than a browser automation package. Future work should add archival data adapters with licensing review, richer calibration models, authenticated accounts, production telemetry, managed secrets/backups, and a full browser test matrix.
+
+## Credits
+
+PARALLAX is a course/project observatory prototype built around transparent scientific communication: the detector measures; people review; provenance stays attached to the evidence.
+
+## Screenshot capture
+
+The release capture route list and viewport notes live in [docs/screenshots.md](./docs/screenshots.md). After starting the web app, capture `/`, `/explore`, `/demo`, `/candidates`, `/citizen-science`, `/provenance`, and `/architecture` at desktop and narrow mobile widths. The checks are intentionally manual because this repository does not claim a browser automation dependency.
 
 ## Product guardrails
 
@@ -91,4 +129,4 @@ Phase 7 preserves the Phase 6 evidence and review model, then adds a fast skippa
 - The science service is the only place where image registration, difference imaging, and candidate detection are performed.
 - Ground truth exists only beside the generator for test evaluation; processing endpoints never receive it.
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md), [SETUP.md](./SETUP.md), [SCIENCE.md](./SCIENCE.md), [DATA_PROVENANCE.md](./DATA_PROVENANCE.md), and [DEMO_SCRIPT.md](./DEMO_SCRIPT.md) for the Phase 7 operating notes.
+See [ARCHITECTURE.md](./ARCHITECTURE.md), [SETUP.md](./SETUP.md), [SCIENCE.md](./SCIENCE.md), [DATA_PROVENANCE.md](./DATA_PROVENANCE.md), [DEMO_SCRIPT.md](./DEMO_SCRIPT.md), and [FINAL_RELEASE_CHECKLIST.md](./FINAL_RELEASE_CHECKLIST.md) for release operating notes.

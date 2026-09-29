@@ -11,6 +11,7 @@
     "test:api": "dotnet test tests/api/Parallax.Api.Tests.csproj",
     "test:science": ".venv/bin/pytest -q tests/science",
     "test:explanations": "node --experimental-strip-types --test tests/web/explanations.test.ts",
+    "test:release": "node --experimental-strip-types --test tests/web/release-contract.test.ts",
     "migrate:api": "dotnet tool run dotnet-ef database update --project apps/api/Parallax.Api.csproj --startup-project apps/api/Parallax.Api.csproj",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
