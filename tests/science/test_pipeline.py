@@ -1,0 +1,84 @@
+from __future__ import annotations
+
+from dataclasses import replace
+
+import numpy as np
+
+from services.science.app.pipeline import analyze_observations, detect_candidates, register_observations, screen_candidates
+from services.science.app.synthetic import generate_synthetic_dataset
+
+
+def test_synthetic_generation_is_deterministic() -> None:
+    first = generate_synthetic_dataset(seed=2026)
+    second = generate_synthetic_dataset(seed=2026)
+    assert np.array_equal(first.epoch_a.image, second.epoch_a.image)
+    assert np.array_equal(first.epoch_b.image, second.epoch_b.image)
+    assert first.ground_truth == second.ground_truth
+
+
+def test_registration_recovers_global_shift() -> None:
+    dataset = generate_synthetic_dataset()
+    result = register_observations(dataset.epoch_a, dataset.epoch_b)
+    expected = (-dataset.ground_truth["global_shift_xy"][1], -dataset.ground_truth["global_shift_xy"][0])
+    assert np.allclose(result.shift_yx, expected, atol=0.45)
+    assert result.quality["overlap_fraction"] > 0.95
+
+
+def test_known_motion_is_detected_by_measured_displacement() -> None:
+    dataset = generate_synthetic_dataset()
+    candidates = detect_candidates(dataset.epoch_a, dataset.epoch_b)
+    motion = [candidate for candidate in candidates if candidate["classification"] == "apparent_motion"]
+    assert motion
+    measured = np.array(motion[0]["measurement"]["displacement_pixels_xy"])
+    expected = np.array(dataset.ground_truth["moving"]["intrinsic_offset_xy"])
+    assert np.allclose(measured, expected, atol=1.5)
+
+
+def test_known_brightness_change_is_detected() -> None:
+    dataset = generate_synthetic_dataset()
+    candidates = detect_candidates(dataset.epoch_a, dataset.epoch_b)
+    variable = [candidate for candidate in candidates if candidate["classification"] == "brightness_change"]
+    assert variable
+    assert max(candidate["measurement"]["relative_change"] for candidate in variable) > 0.4
+
+
+def test_identical_epochs_do_not_create_candidates() -> None:
+    dataset = generate_synthetic_dataset()
+    identical_b = replace(dataset.epoch_b, image=dataset.epoch_a.image.copy())
+    candidates = detect_candidates(dataset.epoch_a, identical_b)
+    assert candidates == []
+
+
+def test_artifact_is_not_promoted_to_candidate() -> None:
+    dataset = generate_synthetic_dataset()
+    candidates = detect_candidates(dataset.epoch_a, dataset.epoch_b)
+    artifact = np.array(dataset.ground_truth["artifact"]["position_b_xy"])
+    for candidate in candidates:
+        points = [candidate["measurement"].get("position_xy"), candidate["measurement"].get("position_a_xy"), candidate["measurement"].get("position_b_xy")]
+        for point in points:
+            if point is not None:
+                assert np.linalg.norm(np.array(point) - artifact) > 5.0
+
+
+def test_screening_preserves_artifact_and_uncertain_cases_without_promoting_them() -> None:
+    dataset = generate_synthetic_dataset()
+    screened = screen_candidates(dataset.epoch_a, dataset.epoch_b)
+    assert {item["classification"] for item in screened} == {"likely_artifact", "uncertain"}
+    assert {item["status"] for item in screened} == {"screened", "needs_review"}
+    assert all("confidence" not in item["quality"] for item in screened)
+
+
+def test_injected_signals_survive_higher_noise() -> None:
+    dataset = generate_synthetic_dataset(background_sigma=1.8)
+    candidates = detect_candidates(dataset.epoch_a, dataset.epoch_b)
+    classifications = {candidate["classification"] for candidate in candidates}
+    assert "apparent_motion" in classifications
+    assert "brightness_change" in classifications
+
+
+def test_analysis_contains_measurements_without_ground_truth() -> None:
+    dataset = generate_synthetic_dataset()
+    analysis = analyze_observations(dataset.epoch_a, dataset.epoch_b)
+    assert "ground_truth" not in str(analysis)
+    assert analysis["dataset_label"] == "DEMONSTRATION DATASET"
+    assert analysis["candidates"]

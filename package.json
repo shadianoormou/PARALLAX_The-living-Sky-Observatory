@@ -1,0 +1,23 @@
+{
+  "name": "parallax-living-sky-observatory",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.15.5",
+  "scripts": {
+    "dev:web": "pnpm --filter @parallax/web dev",
+    "build:web": "pnpm --filter @parallax/web build",
+    "lint:web": "pnpm --filter @parallax/web lint",
+    "test": "pnpm --filter @parallax/web typecheck",
+    "test:api": "dotnet test tests/api/Parallax.Api.Tests.csproj",
+    "test:science": ".venv/bin/pytest -q tests/science",
+    "test:explanations": "node --experimental-strip-types --test tests/web/explanations.test.ts",
+    "migrate:api": "dotnet tool run dotnet-ef database update --project apps/api/Parallax.Api.csproj --startup-project apps/api/Parallax.Api.csproj",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "dev:api": "dotnet run --project apps/api/Parallax.Api.csproj",
+    "dev:science": "python3 -m uvicorn app.main:app --app-dir services/science --reload --port 8001"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2"
+  }
+}

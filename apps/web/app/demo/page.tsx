@@ -1,0 +1,10 @@
+import Link from 'next/link';
+import { ArrowUpRight, Check } from 'lucide-react';
+import { PageIntro } from '../../components/page-intro';
+import { RouteFrame } from '../../components/route-frame';
+
+const steps = ['Orient to the observatory', 'Choose two verified epochs', 'Inspect measurement and uncertainty', 'Review the candidate evidence'];
+
+export default function DemoPage() {
+  return <RouteFrame marker="guided investigation"><PageIntro eyebrow="08 / Demo Investigation" title="A guided path through a future comparison." body="The demo route is a product promise, not a fake investigation. It maps the moments a judge will experience once verified demonstration data is connected." /><div className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]"><div className="panel p-6 sm:p-8"><p className="eyebrow">Investigation sequence</p><div className="mt-8 space-y-0">{steps.map((step, index) => <div key={step} className="flex gap-4 border-l border-[var(--line-strong)] pb-7 pl-5 last:pb-0"><span className="-ml-[31px] grid h-6 w-6 shrink-0 place-items-center rounded-full border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--signal)]"><Check size={12} /></span><div><p className="mono text-[10px] uppercase tracking-[.12em] text-[var(--quiet)]">0{index + 1}</p><p className="mt-2 text-sm text-[var(--ink)]">{step}</p></div></div>)}</div></div><div className="panel flex min-h-[360px] flex-col justify-between p-6 sm:p-8"><div><p className="eyebrow">Demonstration boundary</p><h2 className="mt-5 max-w-lg text-3xl font-medium tracking-[-.04em] text-[var(--ink)]">The science moment comes after the provenance moment.</h2><p className="mt-5 max-w-lg text-sm leading-7 text-[var(--muted)]">When the demo dataset exists, this surface will label it clearly, show the source trail, and let the audience see the evidence before hearing an interpretation.</p></div><Link href="/provenance" className="focus-ring mt-10 inline-flex w-fit items-center gap-2 border-b border-[var(--signal)] pb-1 mono text-[10px] uppercase tracking-[.12em] text-[var(--signal)]">Review data requirements <ArrowUpRight size={14} /></Link></div></div></RouteFrame>;
+}
