@@ -15,6 +15,7 @@ const primaryNav = [
 const secondaryNav = [
   { href: '/passport', label: 'Discovery Passport' },
   { href: '/science', label: 'Science Methodology' },
+  { href: '/validation', label: 'Validation Results' },
   { href: '/provenance', label: 'Data Provenance' },
   { href: '/architecture', label: 'Architecture' },
   { href: '/demo', label: 'Demo Investigation' },

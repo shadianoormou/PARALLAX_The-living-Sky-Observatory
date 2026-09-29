@@ -26,9 +26,20 @@ public sealed class ScienceAnalysisResponse
     [JsonPropertyName("registration")] public JsonElement Registration { get; set; } = JsonSerializer.SerializeToElement(new { });
     [JsonPropertyName("photometric_normalization")] public JsonElement PhotometricNormalization { get; set; } = JsonSerializer.SerializeToElement(new { });
     [JsonPropertyName("difference")] public JsonElement Difference { get; set; } = JsonSerializer.SerializeToElement(new { });
+    [JsonPropertyName("comparison")] public ScienceComparisonAssessment Comparison { get; set; } = new();
     [JsonPropertyName("spectral_comparison")] public List<ScienceSpectrum> SpectralComparison { get; set; } = [];
     [JsonPropertyName("candidates")] public List<ScienceCandidate> Candidates { get; set; } = [];
     [JsonPropertyName("screened_candidates")] public List<ScienceReviewItem> ScreenedCandidates { get; set; } = [];
+}
+
+public sealed class ScienceComparisonAssessment
+{
+    [JsonPropertyName("status")] public string Status { get; set; } = "COMPARISON NOT RELIABLE";
+    [JsonPropertyName("reasons")] public List<string> Reasons { get; set; } = [];
+    [JsonPropertyName("blocking_issues")] public List<string> BlockingIssues { get; set; } = [];
+    [JsonPropertyName("warnings")] public List<string> Warnings { get; set; } = [];
+    [JsonPropertyName("sky_overlap_fraction")] public double? SkyOverlapFraction { get; set; }
+    [JsonPropertyName("registration_error")] public double? RegistrationError { get; set; }
 }
 
 public sealed class ScienceCandidate
@@ -76,7 +87,9 @@ public sealed record MeasurementResponse(Guid Id, string MetricName, double? Val
 
 public sealed record SpectrumResponse(Guid Id, string SourceId, JsonElement WavelengthUm, JsonElement FluxEpochA, JsonElement FluxEpochB, JsonElement DeltaFlux, string Interpretation);
 
-public sealed record ProvenanceResponse(Guid CandidateId, string DatasetLabel, string DatasetType, string SourceIdentifier, string DatasetProvenance, JsonElement EpochA, JsonElement EpochB, string AlgorithmVersion, DateTime SourceCreatedAtUtc, DateTime? RetrievalTimestampUtc, DateTime ProcessingStartedAtUtc, DateTime? ProcessingCompletedAtUtc);
+public sealed record ComparisonAssessmentResponse(Guid ProcessingRunId, string Status, IReadOnlyList<string> Reasons, IReadOnlyList<string> BlockingIssues, IReadOnlyList<string> Warnings, double? SkyOverlapFraction, double? RegistrationError, DateTime CreatedAtUtc);
+
+public sealed record ProvenanceResponse(Guid CandidateId, string DatasetLabel, string DatasetType, string SourceIdentifier, string DatasetProvenance, JsonElement EpochA, JsonElement EpochB, string AlgorithmVersion, DateTime SourceCreatedAtUtc, DateTime? RetrievalTimestampUtc, DateTime ProcessingStartedAtUtc, DateTime? ProcessingCompletedAtUtc, ComparisonAssessmentResponse? Comparison);
 
 public sealed record ConsensusResponse(Guid CandidateId, string ClassificationLabel, int VoteCount, int TotalVotes, double AgreementFraction, DateTime CalculatedAtUtc);
 

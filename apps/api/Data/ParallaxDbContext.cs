@@ -10,6 +10,7 @@ public sealed class ParallaxDbContext(DbContextOptions<ParallaxDbContext> option
     public DbSet<Observation> Observations => Set<Observation>();
     public DbSet<ObservationEpoch> ObservationEpochs => Set<ObservationEpoch>();
     public DbSet<ProcessingRun> ProcessingRuns => Set<ProcessingRun>();
+    public DbSet<ComparisonAssessment> ComparisonAssessments => Set<ComparisonAssessment>();
     public DbSet<Candidate> Candidates => Set<Candidate>();
     public DbSet<CandidateMeasurement> CandidateMeasurements => Set<CandidateMeasurement>();
     public DbSet<CandidateSpectrum> CandidateSpectra => Set<CandidateSpectrum>();
@@ -27,6 +28,7 @@ public sealed class ParallaxDbContext(DbContextOptions<ParallaxDbContext> option
         modelBuilder.Entity<Observation>().HasIndex(x => x.ObservationIdentifier).IsUnique();
         modelBuilder.Entity<ObservationEpoch>().HasIndex(x => new { x.ObservationId, x.EpochCode }).IsUnique();
         modelBuilder.Entity<ProcessingRun>().HasIndex(x => x.StartedAtUtc);
+        modelBuilder.Entity<ComparisonAssessment>().HasIndex(x => x.ProcessingRunId).IsUnique();
         modelBuilder.Entity<Candidate>().HasIndex(x => new { x.ProcessingRunId, x.CandidateKey }).IsUnique();
         modelBuilder.Entity<UserProfile>().HasIndex(x => x.ExternalKey).IsUnique();
         modelBuilder.Entity<Classification>().HasIndex(x => new { x.CandidateId, x.UserProfileId }).IsUnique();
@@ -45,6 +47,7 @@ public sealed class ParallaxDbContext(DbContextOptions<ParallaxDbContext> option
         modelBuilder.Entity<SkyRegion>().HasMany(x => x.Candidates).WithOne(x => x.SkyRegion).HasForeignKey(x => x.SkyRegionId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<Observation>().HasMany(x => x.Epochs).WithOne(x => x.Observation).HasForeignKey(x => x.ObservationId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<ProcessingRun>().HasMany(x => x.Candidates).WithOne(x => x.ProcessingRun).HasForeignKey(x => x.ProcessingRunId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ProcessingRun>().HasOne(x => x.ComparisonAssessment).WithOne(x => x.ProcessingRun).HasForeignKey<ComparisonAssessment>(x => x.ProcessingRunId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<Candidate>().HasMany(x => x.Measurements).WithOne(x => x.Candidate).HasForeignKey(x => x.CandidateId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<Candidate>().HasMany(x => x.Spectra).WithOne(x => x.Candidate).HasForeignKey(x => x.CandidateId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<Candidate>().HasMany(x => x.Classifications).WithOne(x => x.Candidate).HasForeignKey(x => x.CandidateId).OnDelete(DeleteBehavior.Cascade);

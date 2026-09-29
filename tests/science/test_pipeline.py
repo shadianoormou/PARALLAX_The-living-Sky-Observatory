@@ -5,7 +5,7 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from services.science.app.pipeline import ObservationValidationError, analyze_observations, detect_candidates, difference_observations, register_observations, screen_candidates
+from services.science.app.pipeline import ObservationValidationError, analyze_observations, assess_comparison_metadata, detect_candidates, difference_observations, register_observations, run_validation_suite, screen_candidates
 from services.science.app.synthetic import generate_synthetic_dataset
 
 
@@ -46,8 +46,24 @@ def test_known_brightness_change_is_detected() -> None:
 def test_registration_rejects_bad_pairs_before_science_processing() -> None:
     dataset = generate_synthetic_dataset()
     malformed = replace(dataset.epoch_b, image=dataset.epoch_b.image[:-1])
-    with pytest.raises(ObservationValidationError, match="dimensions must match"):
+    with pytest.raises(ObservationValidationError, match="COMPARISON NOT RELIABLE"):
         difference_observations(dataset.epoch_a, malformed)
+
+
+def test_comparison_guard_marks_demo_pair_ready_after_registration() -> None:
+    dataset = generate_synthetic_dataset()
+    registration = register_observations(dataset.epoch_a, dataset.epoch_b)
+    assessment = assess_comparison_metadata(dataset.epoch_a.metadata, dataset.epoch_b.metadata, registration.quality["phase_correlation_error"])
+    assert assessment["status"] == "READY TO COMPARE"
+    assert assessment["blocking_issues"] == []
+
+
+def test_comparison_guard_blocks_incompatible_frames() -> None:
+    dataset = generate_synthetic_dataset()
+    incompatible = {**dataset.epoch_b.metadata, "coordinate_frame": "different-frame"}
+    assessment = assess_comparison_metadata(dataset.epoch_a.metadata, incompatible)
+    assert assessment["status"] == "COMPARISON NOT RELIABLE"
+    assert any("coordinate" in reason.lower() for reason in assessment["blocking_issues"])
 
 
 def test_spectral_comparison_preserves_measurements_without_physical_labels() -> None:
@@ -98,3 +114,9 @@ def test_analysis_contains_measurements_without_ground_truth() -> None:
     assert "ground_truth" not in str(analysis)
     assert analysis["dataset_label"] == "DEMONSTRATION DATASET"
     assert analysis["candidates"]
+
+
+def test_validation_suite_reports_measured_cases() -> None:
+    report = run_validation_suite()
+    assert report["summary"] == {"passed": 5, "failed": 0, "total": 5}
+    assert all(case["status"] == "PASS" for case in report["cases"])

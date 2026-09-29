@@ -69,6 +69,18 @@ public sealed class ProcessingRun
     public string? ErrorMessage { get; set; }
     public DatasetSource DatasetSource { get; set; } = null!;
     public ICollection<Candidate> Candidates { get; set; } = [];
+    public ComparisonAssessment? ComparisonAssessment { get; set; }
+}
+
+public sealed class ComparisonAssessment
+{
+    public Guid Id { get; set; }
+    public Guid ProcessingRunId { get; set; }
+    [MaxLength(40)] public string Status { get; set; } = "COMPARISON NOT RELIABLE";
+    public string ReasonsJson { get; set; } = "[]";
+    public string AssessmentJson { get; set; } = "{}";
+    public DateTime CreatedAtUtc { get; set; }
+    public ProcessingRun ProcessingRun { get; set; } = null!;
 }
 
 public sealed class Candidate

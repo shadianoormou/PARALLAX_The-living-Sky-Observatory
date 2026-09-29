@@ -66,14 +66,27 @@ public static class EndpointMappings
 
         app.MapGet("/api/candidates/{id:guid}/provenance", async (Guid id, ParallaxDbContext db, CancellationToken cancellationToken) =>
         {
-            var candidate = await db.Candidates.AsNoTracking().Include(x => x.ProcessingRun).ThenInclude(x => x.DatasetSource).SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+            var candidate = await db.Candidates.AsNoTracking()
+                .Include(x => x.ProcessingRun).ThenInclude(x => x.DatasetSource)
+                .Include(x => x.ProcessingRun).ThenInclude(x => x.ComparisonAssessment)
+                .SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
             if (candidate is null) return Results.NotFound();
             var source = candidate.ProcessingRun.DatasetSource;
             var result = ParseJson(candidate.ProcessingRun.ResultJson);
             var epochs = result.ValueKind == JsonValueKind.Object && result.TryGetProperty("epochs", out var value) ? value : ParseJson("{}");
             var epochA = epochs.ValueKind == JsonValueKind.Object && epochs.TryGetProperty("a", out var a) ? a : ParseJson("{}");
             var epochB = epochs.ValueKind == JsonValueKind.Object && epochs.TryGetProperty("b", out var b) ? b : ParseJson("{}");
-            return Results.Ok(new ProvenanceResponse(candidate.Id, source.Label, source.DatasetType, source.SourceIdentifier, source.ProvenanceJson, epochA, epochB, candidate.ProcessingRun.AlgorithmVersion, source.CreatedAtUtc, source.RetrievalTimestampUtc, candidate.ProcessingRun.StartedAtUtc, candidate.ProcessingRun.CompletedAtUtc));
+            var comparison = candidate.ProcessingRun.ComparisonAssessment is { } assessment
+                ? ParseComparison(assessment.AssessmentJson, candidate.ProcessingRunId, assessment.CreatedAtUtc)
+                : null;
+            return Results.Ok(new ProvenanceResponse(candidate.Id, source.Label, source.DatasetType, source.SourceIdentifier, source.ProvenanceJson, epochA, epochB, candidate.ProcessingRun.AlgorithmVersion, source.CreatedAtUtc, source.RetrievalTimestampUtc, candidate.ProcessingRun.StartedAtUtc, candidate.ProcessingRun.CompletedAtUtc, comparison));
+        });
+
+        app.MapGet("/api/comparisons/{processingRunId:guid}", async (Guid processingRunId, ParallaxDbContext db, CancellationToken cancellationToken) =>
+        {
+            var assessment = await db.ComparisonAssessments.AsNoTracking().SingleOrDefaultAsync(x => x.ProcessingRunId == processingRunId, cancellationToken);
+            if (assessment is null) return Results.NotFound();
+            return Results.Ok(ParseComparison(assessment.AssessmentJson, processingRunId, assessment.CreatedAtUtc));
         });
 
         app.MapGet("/api/candidates/{id:guid}/consensus", async (Guid id, HttpRequest request, ParallaxDbContext db, CancellationToken cancellationToken) =>
@@ -87,6 +100,9 @@ public static class EndpointMappings
 
         app.MapGet("/api/passport", async (HttpRequest request, PassportService passport, CancellationToken cancellationToken) =>
             Results.Ok(await passport.GetAsync(DemoUserKey(request), cancellationToken)));
+
+        app.MapGet("/api/validation", async (IScienceServiceClient science, CancellationToken cancellationToken) =>
+            Results.Ok(await science.RunValidationAsync(cancellationToken)));
 
         app.MapPost("/api/passport/modules/{moduleKey}", async (string moduleKey, HttpRequest request, PassportService passport, CancellationToken cancellationToken) =>
         {
@@ -160,5 +176,11 @@ public static class EndpointMappings
     {
         using var document = JsonDocument.Parse(string.IsNullOrWhiteSpace(value) ? "{}" : value);
         return document.RootElement.Clone();
+    }
+
+    private static ComparisonAssessmentResponse ParseComparison(string value, Guid processingRunId, DateTime createdAtUtc)
+    {
+        var assessment = JsonSerializer.Deserialize<ScienceComparisonAssessment>(value) ?? new ScienceComparisonAssessment();
+        return new ComparisonAssessmentResponse(processingRunId, assessment.Status, assessment.Reasons, assessment.BlockingIssues, assessment.Warnings, assessment.SkyOverlapFraction, assessment.RegistrationError, createdAtUtc);
     }
 }

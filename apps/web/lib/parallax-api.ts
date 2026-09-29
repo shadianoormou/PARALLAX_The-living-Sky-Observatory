@@ -64,6 +64,18 @@ export type Provenance = {
   retrievalTimestampUtc: string | null;
   processingStartedAtUtc: string;
   processingCompletedAtUtc: string | null;
+  comparison: ComparisonAssessment | null;
+};
+
+export type ComparisonAssessment = {
+  processingRunId: string;
+  status: 'READY TO COMPARE' | 'COMPARE WITH CAUTION' | 'COMPARISON NOT RELIABLE' | string;
+  reasons: string[];
+  blockingIssues: string[];
+  warnings: string[];
+  skyOverlapFraction: number | null;
+  registrationError: number | null;
+  createdAtUtc: string;
 };
 
 export type DemoRun = {
@@ -107,6 +119,24 @@ export type Achievement = {
   name: string;
   description: string;
   earnedAtUtc: string;
+};
+
+export type ValidationCase = {
+  id: string;
+  label: string;
+  expected: string;
+  detected: string;
+  error: number | null;
+  status: 'PASS' | 'FAIL' | string;
+};
+
+export type ValidationReport = {
+  suite: string;
+  dataset_label: string;
+  generated_at_utc: string;
+  cases: ValidationCase[];
+  summary: { passed: number; failed: number; total: number };
+  limitations: string[];
 };
 
 export class ParallaxApiError extends Error {
@@ -170,6 +200,7 @@ export const parallaxApi = {
   getConsensus: (id: string) => fetchJson<Consensus[]>(`/api/candidates/${id}/consensus`),
   getPassport: () => fetchJson<Passport>('/api/passport'),
   completeLearningModule: (moduleKey: string) => fetchJson<Passport>(`/api/passport/modules/${moduleKey}`, { method: 'POST' }),
+  getValidation: () => fetchJson<ValidationReport>('/api/validation'),
 };
 
 export function getNumber(measurements: Measurement[], metricName: string) {

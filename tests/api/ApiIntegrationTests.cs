@@ -65,6 +65,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
 public sealed class FakeScienceServiceClient : IScienceServiceClient
 {
+    public Task<JsonElement> RunValidationAsync(CancellationToken cancellationToken) => Task.FromResult(JsonSerializer.SerializeToElement(new { summary = new { passed = 5, failed = 0, total = 5 } }));
+
     public Task<ScienceAnalysisResponse> AnalyzeAsync(ScienceProcessRequest request, CancellationToken cancellationToken)
     {
         var epoch = JsonSerializer.SerializeToElement(new { dataset_label = "DEMONSTRATION DATASET", dataset_id = "synthetic-demo", observation_id = "synthetic-epoch-a", epoch = "A", shape = new[] { 128, 128 }, coordinate_frame = "synthetic tangent-plane pixels", pixel_scale_arcsec = 0.4 });
@@ -73,6 +75,11 @@ public sealed class FakeScienceServiceClient : IScienceServiceClient
         {
             DatasetLabel = "DEMONSTRATION DATASET",
             Epochs = new Dictionary<string, JsonElement> { ["a"] = epoch, ["b"] = epochB },
+            Comparison = new ScienceComparisonAssessment
+            {
+                Status = "READY TO COMPARE",
+                Reasons = ["The observations share compatible dimensions, coordinates, scale, overlap, and bands."],
+            },
             Candidates = [new ScienceCandidate { CandidateId = "motion-001", Classification = "apparent_motion", Interpretation = "possible apparent motion; requires additional verification", Measurement = new() { ["displacement_pixels_xy"] = JsonSerializer.SerializeToElement(new[] { 4.5, -3.2 }) }, Quality = new() { ["registration_error"] = JsonSerializer.SerializeToElement(0.04) } }],
             ScreenedCandidates = [
                 new ScienceReviewItem { CandidateId = "artifact-001", Classification = "likely_artifact", Status = "screened", Interpretation = "elongated residual; likely artifact; not promoted for citizen-science classification", Measurement = new() { ["shape_ratio"] = JsonSerializer.SerializeToElement(3.4) }, Quality = new() { ["component_snr"] = JsonSerializer.SerializeToElement(12.0) } },
@@ -158,6 +165,9 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
         var secondRun = await secondResponse.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(firstRun.GetProperty("id").GetGuid(), secondRun.GetProperty("id").GetGuid());
 
+        var comparison = await client.GetFromJsonAsync<ComparisonAssessmentResponse>($"/api/comparisons/{firstRun.GetProperty("id").GetGuid()}");
+        Assert.Equal("READY TO COMPARE", comparison!.Status);
+
         var candidates = await client.GetFromJsonAsync<List<CandidateListItem>>("/api/candidates");
         Assert.Equal(4, candidates!.Count);
         Assert.Contains(candidates!, candidate => candidate.CandidateKey == "PX-DEMO-017" && candidate.Classification == "apparent_motion");
@@ -171,6 +181,15 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
         using var client = factory.CreateClient();
         var response = await client.GetAsync("/swagger/v1/swagger.json");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Validation_endpoint_returns_science_report()
+    {
+        using var client = factory.CreateClient();
+        var report = await client.GetFromJsonAsync<JsonElement>("/api/validation");
+        Assert.Equal(5, report.GetProperty("summary").GetProperty("passed").GetInt32());
+        Assert.Equal(0, report.GetProperty("summary").GetProperty("failed").GetInt32());
     }
 
     [Fact]

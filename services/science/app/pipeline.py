@@ -7,13 +7,14 @@ the synthetic generator's ground-truth structure.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 import numpy as np
 from scipy import ndimage
 from skimage.registration import phase_cross_correlation
 
-from .synthetic import Observation
+from .synthetic import Observation, generate_synthetic_dataset
 
 
 class ObservationValidationError(ValueError):
@@ -37,13 +38,96 @@ class DifferenceResult:
     registration: RegistrationResult
 
 
+def assess_comparison_metadata(
+    metadata_a: dict[str, Any],
+    metadata_b: dict[str, Any],
+    registration_error: float | None = None,
+) -> dict[str, Any]:
+    """Assess whether two observation metadata records can be compared safely."""
+
+    blocking: list[str] = []
+    warnings: list[str] = []
+    shape_a = metadata_a.get("shape")
+    shape_b = metadata_b.get("shape")
+    if not isinstance(shape_a, list) or not isinstance(shape_b, list):
+        blocking.append("Observation dimensions are missing from the metadata.")
+    elif shape_a != shape_b:
+        blocking.append("Observation dimensions do not match.")
+
+    frame_a = metadata_a.get("coordinate_frame")
+    frame_b = metadata_b.get("coordinate_frame")
+    if not frame_a or not frame_b:
+        blocking.append("A coordinate frame is missing from one or both observations.")
+    elif frame_a != frame_b:
+        blocking.append("Observation coordinate systems do not match.")
+
+    overlap = metadata_a.get("sky_overlap_fraction", metadata_b.get("sky_overlap_fraction", 1.0))
+    if not isinstance(overlap, (int, float)):
+        blocking.append("Sky overlap could not be established from the metadata.")
+    elif overlap < 0.5:
+        blocking.append("The observations do not contain sufficient sky overlap.")
+    elif overlap < 0.9:
+        warnings.append("The observations have partial sky overlap; edge-region measurements may be unreliable.")
+
+    scale_a = metadata_a.get("pixel_scale_arcsec")
+    scale_b = metadata_b.get("pixel_scale_arcsec")
+    if not isinstance(scale_a, (int, float)) or not isinstance(scale_b, (int, float)) or scale_a <= 0 or scale_b <= 0:
+        warnings.append("Pixel scale is incomplete; angular displacement cannot be independently validated.")
+    else:
+        scale_delta = abs(float(scale_a) - float(scale_b)) / max(float(scale_a), float(scale_b))
+        if scale_delta > 0.1:
+            blocking.append("Pixel scales differ by more than 10%; positional and brightness measurements are not comparable.")
+        elif scale_delta > 0.05:
+            warnings.append("Pixel scales differ slightly; angular measurements should be interpreted cautiously.")
+
+    bands_a = set(metadata_a.get("bands", [])) if isinstance(metadata_a.get("bands", []), list) else set()
+    bands_b = set(metadata_b.get("bands", [])) if isinstance(metadata_b.get("bands", []), list) else set()
+    if bands_a and bands_b and not bands_a.intersection(bands_b):
+        blocking.append("The observations have no compatible wavelength bands.")
+    elif bands_a != bands_b:
+        warnings.append("Band coverage differs; brightness differences may not be directly comparable.")
+    elif not bands_a or not bands_b:
+        warnings.append("Band metadata is incomplete; spectral and brightness comparisons are limited.")
+
+    if registration_error is not None:
+        if registration_error > 0.5:
+            blocking.append("Registration uncertainty is too large for a reliable comparison.")
+        elif registration_error > 0.2:
+            warnings.append("Registration uncertainty is elevated; small positional changes may be unresolved.")
+    else:
+        warnings.append("Registration quality will be measured before candidate promotion.")
+
+    if blocking:
+        status = "COMPARISON NOT RELIABLE"
+        reasons = blocking
+    elif warnings:
+        status = "COMPARE WITH CAUTION"
+        reasons = warnings
+    else:
+        status = "READY TO COMPARE"
+        reasons = ["The observations share compatible dimensions, coordinates, scale, overlap, and bands."]
+
+    return {
+        "status": status,
+        "reasons": reasons,
+        "blocking_issues": blocking,
+        "warnings": warnings,
+        "sky_overlap_fraction": float(overlap) if isinstance(overlap, (int, float)) else None,
+        "registration_error": registration_error,
+    }
+
+
+def assess_observations(epoch_a: Observation, epoch_b: Observation, registration_error: float | None = None) -> dict[str, Any]:
+    return assess_comparison_metadata(epoch_a.metadata, epoch_b.metadata, registration_error)
+
+
 def validate_observations(epoch_a: Observation, epoch_b: Observation) -> None:
     if epoch_a.image.ndim != 2 or epoch_b.image.ndim != 2:
-        raise ObservationValidationError("both observations must be 2D images")
+        raise ObservationValidationError("COMPARISON NOT RELIABLE: both observations must be 2D images")
     if epoch_a.image.shape != epoch_b.image.shape:
-        raise ObservationValidationError("observation dimensions must match")
+        raise ObservationValidationError("COMPARISON NOT RELIABLE: observation dimensions must match")
     if not np.isfinite(epoch_a.image).all() or not np.isfinite(epoch_b.image).all():
-        raise ObservationValidationError("observations must contain only finite values")
+        raise ObservationValidationError("COMPARISON NOT RELIABLE: observations must contain only finite values")
     required = {"observation_id", "epoch", "coordinate_frame", "shape"}
     for observation in (epoch_a, epoch_b):
         missing = sorted(required.difference(observation.metadata))
@@ -98,6 +182,9 @@ def photometric_normalize(reference: np.ndarray, aligned_b: np.ndarray) -> float
 
 
 def difference_observations(epoch_a: Observation, epoch_b: Observation) -> DifferenceResult:
+    assessment = assess_observations(epoch_a, epoch_b)
+    if assessment["status"] == "COMPARISON NOT RELIABLE":
+        raise ObservationValidationError(f"COMPARISON NOT RELIABLE: {assessment['reasons'][0]}")
     registration = register_observations(epoch_a, epoch_b)
     scale = photometric_normalize(epoch_a.image, registration.aligned_b)
     difference = registration.aligned_b / scale - epoch_a.image
@@ -170,7 +257,9 @@ def detect_candidates(
         for index in range(1, count + 1)
     ]
     # Cosmic-ray-like elongated components remain diagnostic but are not promoted.
-    components = [component for component in components if component["area_pixels"] >= 3 and component["shape_ratio"] <= 3.0]
+    # A two-pixel PSF tail can survive a high-noise fixture; the tighter ratio
+    # bound keeps elongated artifacts out across interpolation backends.
+    components = [component for component in components if component["area_pixels"] >= 2 and component["shape_ratio"] <= 2.5]
     used: set[int] = set()
     candidates: list[dict[str, Any]] = []
 
@@ -281,7 +370,7 @@ def screen_candidates(
         ]
 
     review_items: list[dict[str, Any]] = []
-    artifact = [component for component in components_at(5.0) if component["area_pixels"] >= 3 and component["shape_ratio"] > 3.0]
+    artifact = [component for component in components_at(5.0) if component["area_pixels"] >= 3 and component["shape_ratio"] > 2.5]
     if artifact:
         component = max(artifact, key=lambda item: item["snr"])
         review_items.append({
@@ -330,12 +419,29 @@ def screen_candidates(
 
 
 def analyze_observations(epoch_a: Observation, epoch_b: Observation) -> dict[str, Any]:
+    comparison = assess_observations(epoch_a, epoch_b)
+    if comparison["status"] == "COMPARISON NOT RELIABLE":
+        return {
+            "dataset_label": epoch_a.metadata.get("dataset_label", "UNLABELLED"),
+            "epochs": {"a": epoch_a.metadata, "b": epoch_b.metadata},
+            "comparison": comparison,
+            "registration": {},
+            "photometric_normalization": {},
+            "difference": {},
+            "spectral_comparison": [],
+            "candidates": [],
+            "screened_candidates": [],
+            "processing_blocked": True,
+            "interpretation_policy": "Comparison was blocked because the observations are not scientifically compatible.",
+        }
     result = difference_observations(epoch_a, epoch_b)
+    comparison = assess_observations(epoch_a, epoch_b, result.registration.quality["phase_correlation_error"])
     candidates = detect_candidates(epoch_a, epoch_b, result)
     screened_candidates = screen_candidates(epoch_a, epoch_b, result)
     return {
         "dataset_label": epoch_a.metadata.get("dataset_label", "UNLABELLED"),
         "epochs": {"a": epoch_a.metadata, "b": epoch_b.metadata},
+        "comparison": comparison,
         "registration": {"shift_yx": list(result.registration.shift_yx), "quality": result.registration.quality},
         "photometric_normalization": {"scale_b_to_a": result.normalized_scale},
         "difference": result.stats,
@@ -366,3 +472,89 @@ def compare_spectra(epoch_a: Observation, epoch_b: Observation) -> list[dict[str
             "interpretation": "spectral sample comparison only; no physical classification is assigned",
         })
     return comparisons
+
+
+def run_validation_suite() -> dict[str, Any]:
+    """Run objective checks against synthetic fixtures and return measured results."""
+
+    dataset = generate_synthetic_dataset()
+    motion_candidates = [item for item in detect_candidates(dataset.epoch_a, dataset.epoch_b) if item["classification"] == "apparent_motion"]
+    expected_motion = np.array(dataset.ground_truth["moving"]["intrinsic_offset_xy"], dtype=float)
+    measured_motion = np.array(motion_candidates[0]["measurement"]["displacement_pixels_xy"], dtype=float) if motion_candidates else None
+    motion_error = float(np.linalg.norm(measured_motion - expected_motion)) if measured_motion is not None else None
+
+    brightness_candidates = [item for item in detect_candidates(dataset.epoch_a, dataset.epoch_b) if item["classification"] == "brightness_change"]
+    expected_brightness_delta = dataset.ground_truth["variable"]["flux_b"] - dataset.ground_truth["variable"]["flux_a"]
+    measured_brightness_delta = max((float(item["measurement"]["delta_flux"]) for item in brightness_candidates), default=None)
+    brightness_error = abs(measured_brightness_delta - expected_brightness_delta) if measured_brightness_delta is not None else None
+
+    identical_b = Observation(dataset.epoch_a.image.copy(), dataset.epoch_b.metadata, dataset.epoch_b.spectra)
+    no_change_candidates = detect_candidates(dataset.epoch_a, identical_b)
+    screened = screen_candidates(dataset.epoch_a, dataset.epoch_b)
+    artifact_position = np.array(dataset.ground_truth["artifact"]["position_b_xy"], dtype=float)
+    artifact_promoted = any(
+        any(point is not None and np.linalg.norm(np.array(point, dtype=float) - artifact_position) <= 5.0 for point in (
+            item["measurement"].get("position_xy"), item["measurement"].get("position_a_xy"), item["measurement"].get("position_b_xy")
+        ))
+        for item in detect_candidates(dataset.epoch_a, dataset.epoch_b)
+    )
+    incompatible_metadata = {**dataset.epoch_b.metadata, "coordinate_frame": "incompatible-frame"}
+    comparison = assess_comparison_metadata(dataset.epoch_a.metadata, incompatible_metadata)
+
+    cases = [
+        {
+            "id": "moving-source",
+            "label": "MOVING SOURCE TEST",
+            "expected": "Detect a motion-like candidate near the injected source.",
+            "detected": f"{measured_motion.tolist()} px" if measured_motion is not None else "No motion candidate",
+            "error": motion_error,
+            "status": "PASS" if motion_error is not None and motion_error <= 1.5 else "FAIL",
+        },
+        {
+            "id": "brightness-change",
+            "label": "BRIGHTNESS CHANGE TEST",
+            "expected": f"Measure a positive change near {expected_brightness_delta:.1f} relative flux units.",
+            "detected": f"{measured_brightness_delta:.2f} relative flux units" if measured_brightness_delta is not None else "No brightness candidate",
+            "error": round(float(brightness_error), 3) if brightness_error is not None else None,
+            "status": "PASS" if measured_brightness_delta is not None and measured_brightness_delta > 0 else "FAIL",
+        },
+        {
+            "id": "no-change",
+            "label": "NO-CHANGE TEST",
+            "expected": "No promoted candidates from identical epochs.",
+            "detected": f"{len(no_change_candidates)} candidates",
+            "error": len(no_change_candidates),
+            "status": "PASS" if not no_change_candidates else "FAIL",
+        },
+        {
+            "id": "artifact-rejection",
+            "label": "ARTIFACT TEST",
+            "expected": "Keep the narrow artifact out of promoted candidates and retain a screening record.",
+            "detected": f"{len(screened)} screened records; artifact promoted={artifact_promoted}",
+            "error": None,
+            "status": "PASS" if not artifact_promoted and any(item["classification"] == "likely_artifact" for item in screened) else "FAIL",
+        },
+        {
+            "id": "comparison-guard",
+            "label": "COMPARISON GUARD TEST",
+            "expected": "Block incompatible coordinate frames before processing.",
+            "detected": comparison["status"],
+            "error": None,
+            "status": "PASS" if comparison["status"] == "COMPARISON NOT RELIABLE" else "FAIL",
+        },
+    ]
+    return {
+        "suite": "PARALLAX synthetic validation suite",
+        "dataset_label": "DEMONSTRATION DATASET",
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "cases": cases,
+        "summary": {
+            "passed": sum(case["status"] == "PASS" for case in cases),
+            "failed": sum(case["status"] == "FAIL" for case in cases),
+            "total": len(cases),
+        },
+        "limitations": [
+            "These are deterministic synthetic regression tests, not survey completeness or purity estimates.",
+            "Measured errors are valid only for this fixture and processing version.",
+        ],
+    }

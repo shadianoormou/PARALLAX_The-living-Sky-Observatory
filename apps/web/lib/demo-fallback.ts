@@ -89,6 +89,16 @@ export function buildPrecomputedDemo(summary: DemoSummary): PrecomputedDemo {
     retrievalTimestampUtc: null,
     processingStartedAtUtc: timestamp,
     processingCompletedAtUtc: timestamp,
+    comparison: {
+      processingRunId: 'precomputed-demo-run',
+      status: 'COMPARE WITH CAUTION',
+      reasons: ['The checked-in artifact is read-only; use the live API for the persisted comparison assessment.'],
+      blockingIssues: [],
+      warnings: ['Registration quality is not independently persisted in this fallback artifact.'],
+      skyOverlapFraction: null,
+      registrationError: null,
+      createdAtUtc: timestamp,
+    },
   });
   const records = Object.fromEntries(allItems.map((item, index) => {
     const listItem = candidates[index];

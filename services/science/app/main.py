@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from .pipeline import ObservationValidationError, analyze_observations, detect_candidates, difference_observations, register_observations
+from .pipeline import ObservationValidationError, analyze_observations, assess_comparison_metadata, detect_candidates, difference_observations, register_observations, run_validation_suite
 from .serialization import difference_summary, registration_summary
 from .synthetic import DEFAULT_SEED, generate_synthetic_dataset
 
@@ -14,6 +14,12 @@ class ProcessRequest(BaseModel):
     dataset: Literal["synthetic-demo"] = "synthetic-demo"
     seed: int = Field(DEFAULT_SEED, ge=0, le=2_147_483_647)
     background_sigma: float = Field(1.0, gt=0, le=10)
+
+
+class ComparisonAssessmentRequest(BaseModel):
+    epoch_a: dict[str, Any]
+    epoch_b: dict[str, Any]
+    registration_error: float | None = Field(default=None, ge=0)
 
 app = FastAPI(
     title="PARALLAX Science Service",
@@ -34,6 +40,16 @@ def health() -> dict[str, str]:
 @app.get("/api/v1/health")
 def versioned_health() -> dict[str, str]:
     return {"service": "parallax-science", "status": "ok", "phase": "scientific-engine"}
+
+
+@app.post("/comparison/assess")
+def comparison_assess(request: ComparisonAssessmentRequest) -> dict:
+    return assess_comparison_metadata(request.epoch_a, request.epoch_b, request.registration_error)
+
+
+@app.post("/validate/run")
+def validate_run() -> dict:
+    return run_validation_suite()
 
 
 @app.post("/process/register")

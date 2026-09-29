@@ -45,6 +45,7 @@ public sealed class DemoAnalysisService(ParallaxDbContext db, IScienceServiceCli
 
         var existingRun = await db.ProcessingRuns
             .Include(x => x.Candidates)
+            .Include(x => x.ComparisonAssessment)
             .Where(x => x.DatasetSourceId == source.Id
                 && x.AlgorithmVersion == AlgorithmVersion
                 && x.Status == "completed"
@@ -53,6 +54,14 @@ public sealed class DemoAnalysisService(ParallaxDbContext db, IScienceServiceCli
             .FirstOrDefaultAsync(cancellationToken);
         if (existingRun is not null)
         {
+            if (existingRun.ComparisonAssessment is null)
+            {
+                var comparison = BuildComparisonAssessment(existingRun, analysis.Comparison);
+                existingRun.ComparisonAssessment = comparison;
+                db.ComparisonAssessments.Add(comparison);
+                await db.SaveChangesAsync(cancellationToken);
+                logger.LogInformation("Backfilled comparison assessment for demo processing run {RunId}", existingRun.Id);
+            }
             logger.LogInformation("Reusing completed demo processing run {RunId} for the same request", existingRun.Id);
             return existingRun;
         }
@@ -72,6 +81,7 @@ public sealed class DemoAnalysisService(ParallaxDbContext db, IScienceServiceCli
             Status = "completed", StartedAtUtc = started, CompletedAtUtc = DateTime.UtcNow,
             ParametersJson = requestJson, ResultJson = JsonSerializer.Serialize(analysis),
         };
+        run.ComparisonAssessment = BuildComparisonAssessment(run, analysis.Comparison);
         db.ProcessingRuns.Add(run);
 
         foreach (var scienceCandidate in analysis.Candidates)
@@ -148,6 +158,15 @@ public sealed class DemoAnalysisService(ParallaxDbContext db, IScienceServiceCli
 
     private static string? InferUnit(string key) => key.Contains("arcsec", StringComparison.OrdinalIgnoreCase) ? "arcsec" : key.Contains("pixels", StringComparison.OrdinalIgnoreCase) ? "pixels" : null;
     private static string DisplayCandidateKey(string scienceCandidateId, string classification) => classification == "apparent_motion" ? "PX-DEMO-017" : scienceCandidateId;
+    private static ComparisonAssessment BuildComparisonAssessment(ProcessingRun run, ScienceComparisonAssessment assessment) => new()
+    {
+        Id = Guid.NewGuid(),
+        ProcessingRunId = run.Id,
+        Status = assessment.Status,
+        ReasonsJson = JsonSerializer.Serialize(assessment.Reasons),
+        AssessmentJson = JsonSerializer.Serialize(assessment),
+        CreatedAtUtc = DateTime.UtcNow,
+    };
     private static JsonElement GetObject(Dictionary<string, JsonElement> values, string key) => values.TryGetValue(key, out var value) ? value : throw new InvalidOperationException($"Science response did not contain epoch {key}.");
     private static string? GetString(JsonElement value, string key) => value.TryGetProperty(key, out var property) && property.ValueKind == JsonValueKind.String ? property.GetString() : null;
     private static double GetDouble(JsonElement value, string key) => value.TryGetProperty(key, out var property) && property.TryGetDouble(out var number) ? number : 0;

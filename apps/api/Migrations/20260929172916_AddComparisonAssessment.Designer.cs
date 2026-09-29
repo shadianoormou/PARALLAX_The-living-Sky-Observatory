@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Parallax.Api.Data;
 
@@ -11,9 +12,11 @@ using Parallax.Api.Data;
 namespace Parallax.Api.Migrations
 {
     [DbContext(typeof(ParallaxDbContext))]
-    partial class ParallaxDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260929172916_AddComparisonAssessment")]
+    partial class AddComparisonAssessment
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

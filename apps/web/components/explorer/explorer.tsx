@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMode } from '../mode-context';
 import {
   CandidateDetail, CandidateListItem, Measurement, ParallaxApiError,
-  Provenance, Region, Spectrum, getArray, getNumber, parallaxApi,
+  ComparisonAssessment, Provenance, Region, Spectrum, getArray, getNumber, parallaxApi,
 } from '../../lib/parallax-api';
 import { loadPrecomputedDemo } from '../../lib/demo-fallback';
 
@@ -313,12 +313,25 @@ function ExplorerWorkspace({ region, candidates, records, images, candidateId, s
       </section>
       <aside className="space-y-5">
         <CandidateQueue candidates={candidates} selectedId={candidateId} select={select} />
+        <ComparisonGuard assessment={record?.provenance.comparison ?? null} />
         <EvidencePanel record={record} expert={expert} showOverlay={showOverlay} setShowOverlay={setShowOverlay} />
         <FieldPanel region={region} provenance={record?.provenance} expert={expert} />
         {record?.spectrum && <SpectrumPanel spectrum={record.spectrum} />}
       </aside>
     </div>
   );
+}
+
+function ComparisonGuard({ assessment }: { assessment: ComparisonAssessment | null }) {
+  const status = assessment?.status ?? 'COMPARISON NOT RELIABLE';
+  const ready = status === 'READY TO COMPARE';
+  const caution = status === 'COMPARE WITH CAUTION';
+  const tone = ready ? 'text-[var(--signal)] border-[var(--signal)]/30 bg-[var(--signal-soft)]' : caution ? 'text-[var(--amber)] border-[var(--amber)]/30 bg-[rgba(243,187,113,.08)]' : 'text-[var(--amber)] border-[var(--amber)]/30 bg-[rgba(243,187,113,.08)]';
+  return <section className="panel overflow-hidden"><div className="border-b border-[var(--line)] px-5 py-4"><div className="flex items-center justify-between gap-3"><div><p className="eyebrow">Comparison Guard</p><h2 className="mt-2 text-xl font-medium tracking-[-.04em] text-[var(--ink)]">Can these epochs be compared?</h2></div><span className={`inline-flex items-center gap-1.5 border px-2 py-1 mono text-[8px] uppercase tracking-[.1em] ${tone}`}><ShieldIcon status={status} /> {status}</span></div></div><div className="space-y-3 p-5"><p className="text-sm leading-6 text-[var(--muted)]">{assessment?.reasons[0] ?? 'No comparison assessment is available for this record.'}</p>{assessment?.reasons.slice(1).map((reason) => <p key={reason} className="border-t border-[var(--line)] pt-3 text-xs leading-5 text-[var(--quiet)]">{reason}</p>)}{assessment?.registrationError !== null && assessment?.registrationError !== undefined && <p className="border-t border-[var(--line)] pt-3 mono text-[10px] uppercase tracking-[.1em] text-[var(--quiet)]">Registration error · {assessment.registrationError.toFixed(3)}</p>}</div></section>;
+}
+
+function ShieldIcon({ status }: { status: string }) {
+  return status === 'READY TO COMPARE' ? <Info size={12} /> : <AlertTriangle size={12} />;
 }
 
 function SkyCanvas({ images, record, mode, layer, epoch, divider, zoom, pan, setPan, setZoom, setDivider, setMode, setPaused, setEpoch, paused, showOverlay }: { images: Partial<Record<keyof typeof ASSETS, PgmImage>>; record?: CandidateRecord; mode: ComparisonMode; layer: DifferenceLayer; epoch: EpochCode; divider: number; zoom: number; pan: Point; setPan: (value: Point | ((current: Point) => Point)) => void; setZoom: (value: number | ((current: number) => number)) => void; setDivider: (value: number) => void; setMode: (value: ComparisonMode) => void; setPaused: (value: boolean) => void; setEpoch: (value: EpochCode) => void; paused: boolean; showOverlay: boolean }) {
