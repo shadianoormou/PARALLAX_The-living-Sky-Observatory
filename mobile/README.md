@@ -1,8 +1,8 @@
 # PARALLAX Observatory Android shell
 
-This Capacitor wrapper opens the verified public PARALLAX deployment:
+This Capacitor wrapper opens the production PARALLAX deployment with the globally hosted Render API:
 
-`https://parallax-living-sky-observatory.kitgiz-1946.chatgpt.site`
+`https://parallax-the-living-sky-observatory.vercel.app`
 
 Build a debug APK from this directory with Java 21 and Android SDK platform 35:
 

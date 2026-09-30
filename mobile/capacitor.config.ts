@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'PARALLAX Observatory',
   webDir: 'www',
   server: {
-    url: 'https://parallax-living-sky-observatory.kitgiz-1946.chatgpt.site',
+    url: 'https://parallax-the-living-sky-observatory.vercel.app',
     cleartext: false,
   },
 };
