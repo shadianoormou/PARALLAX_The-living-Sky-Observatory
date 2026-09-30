@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: parallax-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/ready
+    envVars:
+      - key: PARALLAX_DATABASE_PROVIDER
+        value: postgres
+      - key: ConnectionStrings__DefaultConnection
+        fromDatabase:
+          name: parallax-db
+          property: connectionString
+      - key: ScienceService__BaseUrl
+        fromService:
+          type: web
+          name: parallax-science
+          property: host
+      - key: PARALLAX_APPLY_MIGRATIONS
+        value: "true"
+      - key: PARALLAX_REQUIRE_API_KEY
+        value: "false"
+      - key: PARALLAX_CORS_ORIGINS
+        value: https://parallax-the-living-sky-observatory.vercel.app,https://parallax-living-sky-observatory.kitgiz-1946.chatgpt.site
+
+  - type: web
+    name: parallax-science
+    runtime: docker
+    plan: free
+    dockerfilePath: ./services/science/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+
+databases:
+  - name: parallax-db
+    plan: free
+    databaseName: parallax
+    user: parallax

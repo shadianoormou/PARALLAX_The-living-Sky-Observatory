@@ -1,6 +1,7 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Parallax.Api;
 using Parallax.Api.Data;
 using Parallax.Api.Services;
@@ -23,7 +24,8 @@ builder.Services.AddDbContext<ParallaxDbContext>(options =>
     }
     else if (databaseProvider is "postgres" or "postgresql")
     {
-        options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required for PostgreSQL."));
+        var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required for PostgreSQL.");
+        options.UseNpgsql(NormalizePostgresConnectionString(connectionString));
     }
     else
     {
@@ -33,7 +35,7 @@ builder.Services.AddDbContext<ParallaxDbContext>(options =>
 builder.Services.AddHttpClient<IScienceServiceClient, ScienceServiceClient>((serviceProvider, client) =>
 {
     var baseUrl = serviceProvider.GetRequiredService<IConfiguration>()["ScienceService:BaseUrl"] ?? "http://localhost:8001/";
-    client.BaseAddress = new Uri(baseUrl, UriKind.Absolute);
+    client.BaseAddress = new Uri(NormalizeServiceUrl(baseUrl), UriKind.Absolute);
     var timeoutSeconds = serviceProvider.GetRequiredService<IConfiguration>().GetValue("ScienceService:TimeoutSeconds", 300);
     client.Timeout = TimeSpan.FromSeconds(Math.Clamp(timeoutSeconds, 30, 900));
 });
@@ -109,5 +111,38 @@ app.MapGet("/api/ops/metrics", (ApiMetrics metrics) => Results.Ok(metrics.Snapsh
 app.MapParallaxEndpoints();
 
 app.Run();
+
+static string NormalizeServiceUrl(string value)
+{
+    var candidate = value.Trim();
+    if (!candidate.Contains("://", StringComparison.Ordinal))
+    {
+        var scheme = candidate.EndsWith(".onrender.com", StringComparison.OrdinalIgnoreCase) ? "https" : "http";
+        candidate = $"{scheme}://{candidate}";
+    }
+    return candidate.EndsWith('/') ? candidate : $"{candidate}/";
+}
+
+static string NormalizePostgresConnectionString(string value)
+{
+    var candidate = value.Trim();
+    if (!candidate.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) &&
+        !candidate.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase)) return candidate;
+
+    var uri = new Uri(candidate);
+    var userInfo = uri.UserInfo.Split(':', 2, StringSplitOptions.None);
+    if (userInfo.Length != 2) throw new InvalidOperationException("PostgreSQL URL must include username and password.");
+
+    var builder = new NpgsqlConnectionStringBuilder
+    {
+        Host = uri.Host,
+        Port = uri.IsDefaultPort ? 5432 : uri.Port,
+        Database = Uri.UnescapeDataString(uri.AbsolutePath.Trim('/')),
+        Username = Uri.UnescapeDataString(userInfo[0]),
+        Password = Uri.UnescapeDataString(userInfo[1]),
+        SslMode = SslMode.Require,
+    };
+    return builder.ConnectionString;
+}
 
 public partial class Program;

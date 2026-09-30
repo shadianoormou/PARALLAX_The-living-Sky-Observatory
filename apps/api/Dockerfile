@@ -12,4 +12,4 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /out .
 EXPOSE 5080
-ENTRYPOINT ["dotnet", "Parallax.Api.dll"]
+ENTRYPOINT ["sh", "-c", "dotnet Parallax.Api.dll --urls http://0.0.0.0:${PORT:-5080}"]
