@@ -15,7 +15,8 @@ PARALLAX X helps researchers and citizens triage possible moving or changing obj
 5. Open `/spherex` and use the prefilled coordinate to query two public SPHEREx epochs through IRSA. The real-data path displays archive metadata, quality coverage, bounded FITS previews, measurements, and provenance.
 6. Open `/parallax-x` and click **Run judge brief** with the prefilled target. The UI queues the archive job and shows `queued`/`processing` before the result. Review which bands are ready, blocked, errored, or null results, then inspect the explicit WCS/pixel cross-band consistency status before interpreting a candidate.
 7. Use **Copy review link**, **Export JSON**, or **Export CSV** to hand the exact target query and measured evidence to another reviewer. Optional pilot feedback is persisted only when a reviewer submits it.
-8. Open `/validation` to see the five deterministic regression cases and their measured errors.
+8. Open `/classroom` for the five-step lesson mode. Set a unique anonymous participant code, choose student/teacher/researcher, submit one pilot signal, and inspect the 5–10 participant progress, role mix, and reviewer consensus report. Export the combined impact report for the submission folder.
+9. Open `/validation` to see the five deterministic regression cases and their measured errors.
 
 ## What is scientifically claimed
 
@@ -37,3 +38,4 @@ PARALLAX X helps researchers and citizens triage possible moving or changing obj
 - Valid-pixel and bad-pixel coverage for each real epoch.
 - FITS source URL, retrieval timestamp, checksum, WCS summary, and release metadata.
 - The distinction between promoted candidates, screened artifacts, and human classifications.
+- The distinction between persisted pilot evidence and claimed adoption: an empty or partial pilot report is an honest result.

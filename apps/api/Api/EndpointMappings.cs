@@ -126,18 +126,51 @@ public static class EndpointMappings
                 classifications.Count == 0 ? null : classifications.Max(item => item.CreatedAtUtc)));
         });
 
+        app.MapGet("/api/community/consensus-report", async (ParallaxDbContext db, CancellationToken cancellationToken) =>
+        {
+            var candidates = await db.Candidates.AsNoTracking()
+                .AsSplitQuery()
+                .Include(item => item.Classifications)
+                .Include(item => item.Consensuses)
+                .Where(item => item.Classifications.Count > 0)
+                .OrderByDescending(item => item.CreatedAtUtc)
+                .ToListAsync(cancellationToken);
+            var items = candidates.Select(candidate =>
+            {
+                var labels = candidate.Classifications
+                    .GroupBy(item => item.Label, StringComparer.OrdinalIgnoreCase)
+                    .OrderByDescending(group => group.Count())
+                    .ThenBy(group => group.Key)
+                    .Select(group => new CommunityLabelCount(group.Key, group.Count()))
+                    .ToArray();
+                var leading = candidate.Consensuses.OrderByDescending(item => item.VoteCount).ThenBy(item => item.ClassificationLabel).FirstOrDefault();
+                return new ConsensusReportItem(candidate.Id, candidate.CandidateKey, candidate.Classification, candidate.Status, candidate.Classifications.Count, leading?.ClassificationLabel, leading?.VoteCount ?? 0, leading?.AgreementFraction ?? 0, labels, leading?.CalculatedAtUtc);
+            }).ToArray();
+            var agreements = items.Where(item => item.LeadingLabel is not null).Select(item => item.AgreementFraction).ToArray();
+            return Results.Ok(new ConsensusReportResponse(items.Length, items.Sum(item => item.TotalVotes), agreements.Length, agreements.Length == 0 ? 0 : agreements.Average(), items));
+        });
+
         app.MapGet("/api/research-feedback/metrics", async (ParallaxDbContext db, CancellationToken cancellationToken) =>
         {
             var entries = await db.AuditEntries.AsNoTracking().Where(item => item.Action == "research-feedback").ToListAsync(cancellationToken);
-            var signals = entries
-                .Select(item => ParseJson(item.MetadataJson))
-                .Where(item => item.ValueKind == JsonValueKind.Object && item.TryGetProperty("signal", out _))
-                .GroupBy(item => item.GetProperty("signal").GetString() ?? "unknown", StringComparer.OrdinalIgnoreCase)
+            var metadata = entries.Select(item => new { item.ActorKey, item.CreatedAtUtc, Data = ParseJson(item.MetadataJson) }).Where(item => item.Data.ValueKind == JsonValueKind.Object && item.Data.TryGetProperty("signal", out _)).ToArray();
+            var signals = metadata
+                .GroupBy(item => item.Data.GetProperty("signal").GetString() ?? "unknown", StringComparer.OrdinalIgnoreCase)
                 .OrderByDescending(group => group.Count())
                 .ThenBy(group => group.Key)
                 .Select(group => new CommunityLabelCount(group.Key, group.Count()))
                 .ToArray();
-            return Results.Ok(new ResearchFeedbackMetricsResponse(entries.Count, signals));
+            var roles = metadata
+                .Select(item => item.Data.TryGetProperty("role", out var role) ? role.GetString() : null)
+                .Where(role => !string.IsNullOrWhiteSpace(role))
+                .GroupBy(role => role!, StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(group => group.Count())
+                .ThenBy(group => group.Key)
+                .Select(group => new CommunityLabelCount(group.Key, group.Count()))
+                .ToArray();
+            var uniqueParticipants = metadata.Select(item => item.ActorKey).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+            var status = uniqueParticipants >= 5 ? "minimum-reached" : uniqueParticipants > 0 ? "in-progress" : "not-started";
+            return Results.Ok(new ResearchFeedbackMetricsResponse(metadata.Length, signals, uniqueParticipants, roles, 5, 10, status, metadata.Length == 0 ? null : metadata.Min(item => item.CreatedAtUtc), metadata.Length == 0 ? null : metadata.Max(item => item.CreatedAtUtc)));
         });
 
         app.MapGet("/api/validation", async (IScienceServiceClient science, CancellationToken cancellationToken) =>
@@ -164,15 +197,16 @@ public static class EndpointMappings
         app.MapPost("/api/research-feedback", async (ResearchFeedbackRequest body, HttpRequest request, ParallaxDbContext db, CancellationToken cancellationToken) =>
         {
             var signal = body.Signal.Trim().ToLowerInvariant();
-            if (body.Surface.Trim().ToLowerInvariant() != "parallax-x" || signal is not ("useful" or "unclear" or "would-share"))
-                return Results.ValidationProblem(new Dictionary<string, string[]> { ["signal"] = ["Use useful, unclear, or would-share feedback for the PARALLAX X handoff."] });
+            var role = body.Role.Trim().ToLowerInvariant();
+            if (body.Surface.Trim().ToLowerInvariant() != "parallax-x" || signal is not ("useful" or "unclear" or "would-share") || role is not ("student" or "teacher" or "researcher"))
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["signal"] = ["Use useful, unclear, or would-share feedback and a student, teacher, or researcher role."] });
             db.AuditEntries.Add(new AuditEntry
             {
                 Id = Guid.NewGuid(),
                 Action = "research-feedback",
                 ActorKey = DemoUserKey(request),
                 EntityType = "ResearchHandoff",
-                MetadataJson = JsonSerializer.Serialize(new { surface = "parallax-x", signal, notes = body.Notes?.Trim() }),
+                MetadataJson = JsonSerializer.Serialize(new { surface = "parallax-x", signal, role, notes = body.Notes?.Trim() }),
                 CreatedAtUtc = DateTime.UtcNow,
             });
             await db.SaveChangesAsync(cancellationToken);

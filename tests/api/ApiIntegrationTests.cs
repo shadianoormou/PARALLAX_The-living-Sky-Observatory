@@ -260,13 +260,30 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
     public async Task Research_handoff_feedback_is_persisted_and_measurable()
     {
         using var client = factory.CreateClient();
-        var submit = await client.PostAsJsonAsync("/api/research-feedback", new ResearchFeedbackRequest("parallax-x", "useful"));
+        client.DefaultRequestHeaders.Add("X-Demo-User", "pilot:teacher-01");
+        var submit = await client.PostAsJsonAsync("/api/research-feedback", new ResearchFeedbackRequest("parallax-x", "useful", "Clear enough for a classroom pilot.", "teacher"));
         Assert.Equal(HttpStatusCode.OK, submit.StatusCode);
 
         var metrics = await client.GetFromJsonAsync<ResearchFeedbackMetricsResponse>("/api/research-feedback/metrics");
         Assert.NotNull(metrics);
         Assert.True(metrics!.TotalFeedback >= 1);
+        Assert.True(metrics.UniqueParticipants >= 1);
+        Assert.Contains(metrics.Roles!, role => role.Label == "teacher");
         Assert.Contains(metrics.Signals, signal => signal.Label == "useful");
+    }
+
+    [Fact]
+    public async Task Consensus_report_returns_aggregate_reviewer_evidence()
+    {
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Demo-User", "pilot:student-01");
+        var submit = await client.PostAsJsonAsync("/api/classifications", new ClassificationRequest(factory.CandidateId, "uncertain", Confidence: "LOW"));
+        Assert.Equal(HttpStatusCode.OK, submit.StatusCode);
+
+        var report = await client.GetFromJsonAsync<ConsensusReportResponse>("/api/community/consensus-report");
+        Assert.NotNull(report);
+        Assert.True(report!.CandidatesReviewed >= 1);
+        Assert.Contains(report.Items, item => item.CandidateKey == "motion-001" && item.TotalVotes >= 1);
     }
 
     [Fact]

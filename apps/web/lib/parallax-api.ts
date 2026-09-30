@@ -128,6 +128,34 @@ export type CommunityMetrics = {
 export type ResearchFeedbackMetrics = {
   totalFeedback: number;
   signals: Array<{ label: string; count: number }>;
+  uniqueParticipants: number;
+  roles: Array<{ label: string; count: number }>;
+  minimumParticipants: number;
+  recommendedParticipants: number;
+  pilotStatus: 'not-started' | 'in-progress' | 'minimum-reached' | string;
+  firstFeedbackAtUtc: string | null;
+  lastFeedbackAtUtc: string | null;
+};
+
+export type ConsensusReportItem = {
+  candidateId: string;
+  candidateKey: string;
+  scientificClassification: string;
+  status: string;
+  totalVotes: number;
+  leadingLabel: string | null;
+  leadingVotes: number;
+  agreementFraction: number;
+  labels: Array<{ label: string; count: number }>;
+  calculatedAtUtc: string | null;
+};
+
+export type ConsensusReport = {
+  candidatesReviewed: number;
+  totalVotes: number;
+  candidatesWithConsensus: number;
+  averageAgreement: number;
+  items: ConsensusReportItem[];
 };
 
 export type SpherexValidationRequest = {
@@ -361,9 +389,10 @@ export const parallaxApi = {
   getPassport: () => fetchJson<Passport>('/api/passport'),
   getCommunityMetrics: () => fetchJson<CommunityMetrics>('/api/community/metrics'),
   getResearchFeedbackMetrics: () => fetchJson<ResearchFeedbackMetrics>('/api/research-feedback/metrics'),
-  submitResearchFeedback: (signal: 'useful' | 'unclear' | 'would-share', notes?: string) => fetchJson<{ signal: string; recordedAtUtc: string }>('/api/research-feedback', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ surface: 'parallax-x', signal, notes }),
+  submitResearchFeedback: (signal: 'useful' | 'unclear' | 'would-share', notes?: string, role: 'student' | 'teacher' | 'researcher' = 'researcher') => fetchJson<{ signal: string; recordedAtUtc: string }>('/api/research-feedback', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ surface: 'parallax-x', signal, notes, role }),
   }),
+  getConsensusReport: () => fetchJson<ConsensusReport>('/api/community/consensus-report'),
   completeLearningModule: (moduleKey: string) => fetchJson<Passport>(`/api/passport/modules/${moduleKey}`, { method: 'POST' }),
   getValidation: () => fetchJson<ValidationReport>('/api/validation'),
   searchSpherex: (request: SpherexArchiveRequest) => fetchJson<SpherexArchiveSearch>('/api/archive/spherex/search', {

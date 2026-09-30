@@ -76,6 +76,8 @@ For longer archive runs, use `POST /archive/spherex/evidence-graph/jobs` (or the
 
 The PARALLAX X result can be shared with its coordinate/band query in the URL and exported as a JSON evidence bundle for researcher handoff. The page also records optional pilot feedback at `/api/research-feedback`; feedback is persisted as an audit event and is not presented as adoption unless a person submits it.
 
+For a real-world impact pilot, open `/classroom`. Invite 5–10 astronomy students, teachers, or researchers. Each participant saves a self-chosen anonymous browser code, selects a role, completes the five-step lesson, and records one `useful`, `unclear`, or `would-share` signal with optional notes. `GET /api/research-feedback/metrics` reports total events, distinct participants, role counts, signal counts, and whether the minimum five-person target has been reached. `GET /api/community/consensus-report` exposes aggregate candidate label counts and agreement without reviewer identities. The classroom page exports a combined pilot/consensus JSON report; no adoption value is claimed until real participants submit feedback.
+
 The processing service accepts the deterministic demo request:
 
 ```bash

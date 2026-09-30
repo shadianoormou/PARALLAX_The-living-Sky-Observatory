@@ -13,6 +13,7 @@ const primaryNav = [
 ];
 
 const secondaryNav = [
+  { href: '/classroom', label: 'Classroom + Pilot' },
   { href: '/passport', label: 'Discovery Passport' },
   { href: '/science', label: 'Science Methodology' },
   { href: '/validation', label: 'Validation Results' },

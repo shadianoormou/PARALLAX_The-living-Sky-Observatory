@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, ArrowUpRight, Download, Info, Play, Pause, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Copy, Download, Info, Play, Pause, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useMode } from '../mode-context';
@@ -47,6 +47,7 @@ export function CandidateDetail() {
 
 function CandidateInvestigation({ record, expert }: { record: CandidateRecord; expert: boolean }) {
   const [downloaded, setDownloaded] = useState(false);
+  const [shared, setShared] = useState(false);
   const displacement = getArray(record.measurements, 'measurement.displacement_arcsec_xy');
   const displacementPixels = getArray(record.measurements, 'measurement.displacement_pixels_xy');
   const position = getArray(record.measurements, 'measurement.position_xy');
@@ -74,10 +75,20 @@ function CandidateInvestigation({ record, expert }: { record: CandidateRecord; e
     setDownloaded(true);
   };
 
+  const share = async () => {
+    const url = `${window.location.origin}/candidates/${record.detail.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setShared(true);
+    } catch {
+      setShared(false);
+    }
+  };
+
   return (
     <main className="min-h-[calc(100vh-72px)] bg-[var(--void)]">
       <div className="observatory-grid mx-auto min-h-[calc(100vh-72px)] max-w-[1440px] px-5 py-8 sm:px-8 lg:px-12">
-        <div className="flex flex-wrap items-center justify-between gap-4"><Link href="/candidates" className="focus-ring inline-flex items-center gap-2 mono text-[10px] uppercase tracking-[.12em] text-[var(--muted)] hover:text-[var(--signal)]"><ArrowLeft size={14} /> Back to Sky Mysteries</Link><div className="flex items-center gap-3"><span className="rounded-full border border-[var(--signal)]/30 bg-[var(--signal-soft)] px-2.5 py-1 mono text-[9px] uppercase tracking-[.12em] text-[var(--signal)]">{record.detail.status}</span>{expert && <button type="button" onClick={download} className="focus-ring inline-flex items-center gap-2 rounded-full border border-[var(--line-strong)] px-3 py-2 mono text-[9px] uppercase tracking-[.1em] text-[var(--muted)] hover:border-[var(--signal)] hover:text-[var(--signal)]"><Download size={13} /> {downloaded ? 'Downloaded' : 'Download metadata JSON'}</button>}</div></div>
+        <div className="flex flex-wrap items-center justify-between gap-4"><Link href="/candidates" className="focus-ring inline-flex items-center gap-2 mono text-[10px] uppercase tracking-[.12em] text-[var(--muted)] hover:text-[var(--signal)]"><ArrowLeft size={14} /> Back to Sky Mysteries</Link><div className="flex flex-wrap items-center gap-2"><span className="rounded-full border border-[var(--signal)]/30 bg-[var(--signal-soft)] px-2.5 py-1 mono text-[9px] uppercase tracking-[.12em] text-[var(--signal)]">{record.detail.status}</span><button type="button" onClick={() => void share()} className="focus-ring inline-flex items-center gap-2 rounded-full border border-[var(--line-strong)] px-3 py-2 mono text-[9px] uppercase tracking-[.1em] text-[var(--muted)] hover:border-[var(--cyan)] hover:text-[var(--cyan)]"><Copy size={13} /> {shared ? 'Review link copied' : 'Copy review link'}</button><button type="button" onClick={download} className="focus-ring inline-flex items-center gap-2 rounded-full border border-[var(--line-strong)] px-3 py-2 mono text-[9px] uppercase tracking-[.1em] text-[var(--muted)] hover:border-[var(--signal)] hover:text-[var(--signal)]"><Download size={13} /> {downloaded ? 'Exported' : 'Export evidence JSON'}</button></div></div>
         <header className="mt-8 border-b border-[var(--line)] pb-8"><p className="eyebrow">Candidate investigation / {record.detail.candidateKey}</p><div className="mt-4 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between"><div><h1 className="text-4xl font-medium tracking-[-.06em] text-[var(--ink)] sm:text-5xl">What changed?</h1><p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--muted)]">A structured investigation of a {record.detail.classification.replaceAll('_', ' ')} candidate. Measurement stays separate from interpretation.</p></div><Link href={`/explore?candidate=${record.detail.id}`} className="focus-ring inline-flex w-fit items-center gap-2 rounded-full bg-[var(--signal)] px-4 py-3 mono text-[10px] uppercase tracking-[.12em] text-[var(--void)]">Open in observatory <ArrowUpRight size={14} /></Link></div></header>
 
         <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Identity label="Candidate ID" value={record.detail.candidateKey} /><Identity label="Classification" value={record.detail.classification.replaceAll('_', ' ')} /><Identity label="Epoch A / B" value={`${String(epochA.observation_id ?? 'A')} → ${String(epochB.observation_id ?? 'B')}`} /><Identity label="Dataset" value={record.detail.datasetLabel} /></section>

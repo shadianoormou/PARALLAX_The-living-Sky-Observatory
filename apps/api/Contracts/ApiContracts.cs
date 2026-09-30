@@ -151,8 +151,35 @@ public sealed record CommunityMetricsResponse(
 public sealed record ResearchFeedbackRequest(
     [property: JsonPropertyName("surface")] string Surface,
     [property: JsonPropertyName("signal")] string Signal,
-    [property: JsonPropertyName("notes")] string? Notes = null);
+    [property: JsonPropertyName("notes")] string? Notes = null,
+    [property: JsonPropertyName("role")] string Role = "researcher");
 
 public sealed record ResearchFeedbackMetricsResponse(
     int TotalFeedback,
-    IReadOnlyList<CommunityLabelCount> Signals);
+    IReadOnlyList<CommunityLabelCount> Signals,
+    int UniqueParticipants = 0,
+    IReadOnlyList<CommunityLabelCount>? Roles = null,
+    int MinimumParticipants = 5,
+    int RecommendedParticipants = 10,
+    string PilotStatus = "not-started",
+    DateTime? FirstFeedbackAtUtc = null,
+    DateTime? LastFeedbackAtUtc = null);
+
+public sealed record ConsensusReportItem(
+    Guid CandidateId,
+    string CandidateKey,
+    string ScientificClassification,
+    string Status,
+    int TotalVotes,
+    string? LeadingLabel,
+    int LeadingVotes,
+    double AgreementFraction,
+    IReadOnlyList<CommunityLabelCount> Labels,
+    DateTime? CalculatedAtUtc);
+
+public sealed record ConsensusReportResponse(
+    int CandidatesReviewed,
+    int TotalVotes,
+    int CandidatesWithConsensus,
+    double AverageAgreement,
+    IReadOnlyList<ConsensusReportItem> Items);
