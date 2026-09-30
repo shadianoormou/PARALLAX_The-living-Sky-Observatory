@@ -22,21 +22,20 @@ The Vercel judge build is connected to the globally hosted Render API and Postgr
 
 ## Download clients
 
-The public `v0.1.0` release contains the two installable client packages:
+The public `v0.1.4` release contains clients connected to the live Vercel frontend and Render API/PostgreSQL backend:
 
-- [Android APK — `PARALLAX-Observatory-debug.apk`](https://github.com/shadianoormou/PARALLAX_The-living-Sky-Observatory/releases/download/v0.1.0/PARALLAX-Observatory-debug.apk) — debug-signed Android build; internet connection required.
-- [Windows x64 ZIP — `PARALLAX-Observatory-0.1.0-win-x64.zip`](https://github.com/shadianoormou/PARALLAX_The-living-Sky-Observatory/releases/download/v0.1.0/PARALLAX-Observatory-0.1.0-win-x64.zip) — packaged Electron desktop client; internet connection required.
-- [View all `v0.1.0` release assets](https://github.com/shadianoormou/PARALLAX_The-living-Sky-Observatory/releases/tag/v0.1.0)
+- [Android APK — `PARALLAX-Observatory-live-backend-debug.apk`](https://github.com/shadianoormou/PARALLAX_The-living-Sky-Observatory/releases/download/v0.1.4/PARALLAX-Observatory-live-backend-debug.apk) — debug-signed Android build; internet connection required.
+- [Windows x64 portable ZIP — `PARALLAX-Observatory-live-backend-win-x64.zip`](https://github.com/shadianoormou/PARALLAX_The-living-Sky-Observatory/releases/download/v0.1.4/PARALLAX-Observatory-live-backend-win-x64.zip) — extract and launch the packaged Electron client; internet connection required.
+- [View the public `v0.1.4` release](https://github.com/shadianoormou/PARALLAX_The-living-Sky-Observatory/releases/tag/v0.1.4)
 
 These binaries are convenience shells around the public web observatory. They do not bundle the archive-processing backend or claim offline scientific analysis.
 
 ### Live-backend client builds
 
-The rebuilt clients below open the Vercel production frontend, which is connected to the globally hosted Render API and PostgreSQL stack:
+The release workflow rebuilds both clients from the tagged source and publishes SHA-verified assets:
 
-- Android: `PARALLAX-Observatory-live-backend-debug.apk`
-- Windows x64 portable: `PARALLAX-Observatory-live-backend-win-x64.zip`
-- Windows x64 installer: `PARALLAX-Observatory-live-backend-win-x64.exe`
+- Android: [download APK](https://github.com/shadianoormou/PARALLAX_The-living-Sky-Observatory/releases/download/v0.1.4/PARALLAX-Observatory-live-backend-debug.apk)
+- Windows x64 portable: [download ZIP](https://github.com/shadianoormou/PARALLAX_The-living-Sky-Observatory/releases/download/v0.1.4/PARALLAX-Observatory-live-backend-win-x64.zip)
 
 These clients require an internet connection. The Android shell configuration is in [mobile/capacitor.config.ts](./mobile/capacitor.config.ts), and the Windows shell target is defined in [desktop/main.cjs](./desktop/main.cjs).
 
@@ -197,7 +196,7 @@ The installable debug APK is generated at:
 mobile/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The published APK is available from the [v0.1.0 release](https://github.com/shadianoormou/PARALLAX_The-living-Sky-Observatory/releases/tag/v0.1.0).
+The published APK is available from the [v0.1.4 release](https://github.com/shadianoormou/PARALLAX_The-living-Sky-Observatory/releases/tag/v0.1.4).
 
 This is an installable debug build, not a Play Store release signed with a production keystore.
 
@@ -216,7 +215,7 @@ pnpm dist:linux
 
 The desktop shell uses `contextIsolation`, disables Node integration in the renderer, restricts permission requests, and opens external HTTPS links outside the application window.
 
-The published Windows x64 package is available from the [v0.1.0 release](https://github.com/shadianoormou/PARALLAX_The-living-Sky-Observatory/releases/tag/v0.1.0).
+The published Windows x64 package is available from the [v0.1.4 release](https://github.com/shadianoormou/PARALLAX_The-living-Sky-Observatory/releases/tag/v0.1.4).
 
 ## Scientific boundaries
 
