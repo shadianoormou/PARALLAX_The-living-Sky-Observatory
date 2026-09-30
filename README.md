@@ -17,6 +17,16 @@ It is designed around one rule: **a candidate is not a discovery**.
 
 The hosted judge build is a static, read-only presentation of the validated demo path. The full SQL-backed processing stack is available through Docker Compose for local or self-hosted deployment.
 
+## Download clients
+
+The public `v0.1.0` release contains the two installable client packages:
+
+- [Android APK — `PARALLAX-Observatory-debug.apk`](https://github.com/shadianoormou/PARALLAX_The-living-Sky-Observatory/releases/download/v0.1.0/PARALLAX-Observatory-debug.apk) — debug-signed Android build; internet connection required.
+- [Windows x64 ZIP — `PARALLAX-Observatory-0.1.0-win-x64.zip`](https://github.com/shadianoormou/PARALLAX_The-living-Sky-Observatory/releases/download/v0.1.0/PARALLAX-Observatory-0.1.0-win-x64.zip) — packaged Electron desktop client; internet connection required.
+- [View all `v0.1.0` release assets](https://github.com/shadianoormou/PARALLAX_The-living-Sky-Observatory/releases/tag/v0.1.0)
+
+These binaries are convenience shells around the public web observatory. They do not bundle the archive-processing backend or claim offline scientific analysis.
+
 ## Why PARALLAX exists
 
 Time-domain astronomy finds meaning in change: movement, fading, brightening, and unexpected residuals across repeated observations. The same comparison can also be fooled by bad pixels, cosmic rays, incomplete coverage, registration error, or low signal-to-noise.
@@ -174,6 +184,8 @@ The installable debug APK is generated at:
 mobile/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
+The published APK is available from the [v0.1.0 release](https://github.com/shadianoormou/PARALLAX_The-living-Sky-Observatory/releases/tag/v0.1.0).
+
 This is an installable debug build, not a Play Store release signed with a production keystore.
 
 ## Desktop app
@@ -190,6 +202,8 @@ pnpm dist:linux
 ```
 
 The desktop shell uses `contextIsolation`, disables Node integration in the renderer, restricts permission requests, and opens external HTTPS links outside the application window.
+
+The published Windows x64 package is available from the [v0.1.0 release](https://github.com/shadianoormou/PARALLAX_The-living-Sky-Observatory/releases/tag/v0.1.0).
 
 ## Scientific boundaries
 
