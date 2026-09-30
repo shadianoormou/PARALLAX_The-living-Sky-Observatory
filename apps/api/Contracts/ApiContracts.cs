@@ -147,3 +147,12 @@ public sealed record CommunityMetricsResponse(
     IReadOnlyList<CommunityLabelCount> Labels,
     DateTime? FirstReviewAtUtc,
     DateTime? LastReviewAtUtc);
+
+public sealed record ResearchFeedbackRequest(
+    [property: JsonPropertyName("surface")] string Surface,
+    [property: JsonPropertyName("signal")] string Signal,
+    [property: JsonPropertyName("notes")] string? Notes = null);
+
+public sealed record ResearchFeedbackMetricsResponse(
+    int TotalFeedback,
+    IReadOnlyList<CommunityLabelCount> Signals);

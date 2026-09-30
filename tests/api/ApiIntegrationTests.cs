@@ -238,6 +238,19 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Research_handoff_feedback_is_persisted_and_measurable()
+    {
+        using var client = factory.CreateClient();
+        var submit = await client.PostAsJsonAsync("/api/research-feedback", new ResearchFeedbackRequest("parallax-x", "useful"));
+        Assert.Equal(HttpStatusCode.OK, submit.StatusCode);
+
+        var metrics = await client.GetFromJsonAsync<ResearchFeedbackMetricsResponse>("/api/research-feedback/metrics");
+        Assert.NotNull(metrics);
+        Assert.True(metrics!.TotalFeedback >= 1);
+        Assert.Contains(metrics.Signals, signal => signal.Label == "useful");
+    }
+
+    [Fact]
     public async Task Classification_rejects_unknown_confidence_without_persisting_it()
     {
         using var client = factory.CreateClient();

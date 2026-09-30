@@ -72,6 +72,8 @@ The same report is available through `POST /archive/spherex/validate` on the sci
 
 PARALLAX X adds a same-target, multi-band evidence chain. `POST /archive/spherex/evidence-graph` (or `/api/archive/spherex/evidence-graph`) accepts two to six bands and returns per-band epochs, quality gates, candidates, null results, and a provenance graph. The browser workflow is `/parallax-x`. The API proxy allows up to five minutes for a multi-band archive request; configure `ScienceService:TimeoutSeconds` for a different deployment limit. Cross-band agreement is evidence context, not a discovery probability.
 
+The PARALLAX X result can be shared with its coordinate/band query in the URL and exported as a JSON evidence bundle for researcher handoff. The page also records optional pilot feedback at `/api/research-feedback`; feedback is persisted as an audit event and is not presented as adoption unless a person submits it.
+
 The processing service accepts the deterministic demo request:
 
 ```bash

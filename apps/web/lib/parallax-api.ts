@@ -125,6 +125,11 @@ export type CommunityMetrics = {
   lastReviewAtUtc: string | null;
 };
 
+export type ResearchFeedbackMetrics = {
+  totalFeedback: number;
+  signals: Array<{ label: string; count: number }>;
+};
+
 export type SpherexValidationRequest = {
   fields: Array<{
     label: string;
@@ -171,6 +176,7 @@ export type SpherexEvidenceBand = {
   candidates: Array<JsonObject>;
   screened_candidates: Array<JsonObject>;
   elapsed_seconds: number;
+  cache_hit?: boolean;
   error?: string;
 };
 
@@ -188,6 +194,7 @@ export type SpherexEvidenceGraph = {
     bands_with_candidates: number;
     consistency_status: string;
     matched_candidate_groups: number;
+    processing_mode: string;
   };
   bands: SpherexEvidenceBand[];
   cross_band_consistency: {
@@ -339,6 +346,10 @@ export const parallaxApi = {
   getConsensus: (id: string) => fetchJson<Consensus[]>(`/api/candidates/${id}/consensus`),
   getPassport: () => fetchJson<Passport>('/api/passport'),
   getCommunityMetrics: () => fetchJson<CommunityMetrics>('/api/community/metrics'),
+  getResearchFeedbackMetrics: () => fetchJson<ResearchFeedbackMetrics>('/api/research-feedback/metrics'),
+  submitResearchFeedback: (signal: 'useful' | 'unclear' | 'would-share', notes?: string) => fetchJson<{ signal: string; recordedAtUtc: string }>('/api/research-feedback', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ surface: 'parallax-x', signal, notes }),
+  }),
   completeLearningModule: (moduleKey: string) => fetchJson<Passport>(`/api/passport/modules/${moduleKey}`, { method: 'POST' }),
   getValidation: () => fetchJson<ValidationReport>('/api/validation'),
   searchSpherex: (request: SpherexArchiveRequest) => fetchJson<SpherexArchiveSearch>('/api/archive/spherex/search', {

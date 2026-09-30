@@ -16,6 +16,8 @@ This is the Phase 8 release gate. It records what was verified locally and what 
 - [x] A repeatable three-field SPHEREx validation report records independent ready/caution/blocked/error outcomes without fabricating archive results.
 - [x] PARALLAX X exposes a multi-band SPHEREx evidence graph with per-band quality gates, epochs, candidates, null results, and explicit interpretation limits.
 - [x] The judge flow exposes cautious cross-band consistency associations and a measured impact path without inventing adoption numbers.
+- [x] Researcher handoff supports shareable query links, JSON evidence export, and persisted opt-in pilot feedback.
+- [x] Multi-band evidence processing is bounded-parallel and uses a short-lived cache for repeat review without caching archive errors.
 - [x] Privacy-preserving community adoption metrics are persisted and displayed from real classification rows.
 
 ## Operations and security

@@ -126,6 +126,20 @@ public static class EndpointMappings
                 classifications.Count == 0 ? null : classifications.Max(item => item.CreatedAtUtc)));
         });
 
+        app.MapGet("/api/research-feedback/metrics", async (ParallaxDbContext db, CancellationToken cancellationToken) =>
+        {
+            var entries = await db.AuditEntries.AsNoTracking().Where(item => item.Action == "research-feedback").ToListAsync(cancellationToken);
+            var signals = entries
+                .Select(item => ParseJson(item.MetadataJson))
+                .Where(item => item.ValueKind == JsonValueKind.Object && item.TryGetProperty("signal", out _))
+                .GroupBy(item => item.GetProperty("signal").GetString() ?? "unknown", StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(group => group.Count())
+                .ThenBy(group => group.Key)
+                .Select(group => new CommunityLabelCount(group.Key, group.Count()))
+                .ToArray();
+            return Results.Ok(new ResearchFeedbackMetricsResponse(entries.Count, signals));
+        });
+
         app.MapGet("/api/validation", async (IScienceServiceClient science, CancellationToken cancellationToken) =>
             Results.Ok(await science.RunValidationAsync(cancellationToken)));
 
@@ -140,6 +154,24 @@ public static class EndpointMappings
 
         app.MapPost("/api/archive/spherex/evidence-graph", async (SpherexEvidenceGraphRequest body, IScienceServiceClient science, CancellationToken cancellationToken) =>
             Results.Ok(await science.EvidenceGraphSpherexAsync(body, cancellationToken)));
+
+        app.MapPost("/api/research-feedback", async (ResearchFeedbackRequest body, HttpRequest request, ParallaxDbContext db, CancellationToken cancellationToken) =>
+        {
+            var signal = body.Signal.Trim().ToLowerInvariant();
+            if (body.Surface.Trim().ToLowerInvariant() != "parallax-x" || signal is not ("useful" or "unclear" or "would-share"))
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["signal"] = ["Use useful, unclear, or would-share feedback for the PARALLAX X handoff."] });
+            db.AuditEntries.Add(new AuditEntry
+            {
+                Id = Guid.NewGuid(),
+                Action = "research-feedback",
+                ActorKey = DemoUserKey(request),
+                EntityType = "ResearchHandoff",
+                MetadataJson = JsonSerializer.Serialize(new { surface = "parallax-x", signal, notes = body.Notes?.Trim() }),
+                CreatedAtUtc = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.Ok(new { signal, recordedAtUtc = DateTime.UtcNow });
+        });
 
         app.MapPost("/api/passport/modules/{moduleKey}", async (string moduleKey, HttpRequest request, PassportService passport, CancellationToken cancellationToken) =>
         {

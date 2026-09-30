@@ -7,12 +7,20 @@ remain visible instead of being silently averaged away.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
-from time import perf_counter
+from concurrent.futures import ThreadPoolExecutor
+from threading import RLock
+from time import perf_counter, monotonic
 from typing import Any, Callable
 
 from .adapters import ArchiveAdapterError, SpherexIrsaAdapter
 from .pipeline import ObservationValidationError, analyze_observations
+
+
+_EVIDENCE_CACHE: dict[tuple[tuple[str, Any], ...], tuple[float, dict[str, Any]]] = {}
+_EVIDENCE_CACHE_LOCK = RLock()
+_EVIDENCE_CACHE_TTL_SECONDS = 180.0
 
 
 @dataclass(frozen=True)
@@ -86,6 +94,78 @@ def _cross_band_consistency(results: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _run_band_analysis(
+    band: str,
+    query: dict[str, Any],
+    adapter_factory: Callable[..., SpherexIrsaAdapter],
+) -> dict[str, Any]:
+    """Analyze one band, using a short-lived metadata cache for repeated judge runs."""
+
+    cache_enabled = adapter_factory is SpherexIrsaAdapter
+    cache_key = tuple(sorted(query.items()))
+    now = monotonic()
+    if cache_enabled:
+        with _EVIDENCE_CACHE_LOCK:
+            cached = _EVIDENCE_CACHE.get(cache_key)
+            if cached and now - cached[0] < _EVIDENCE_CACHE_TTL_SECONDS:
+                result = deepcopy(cached[1])
+                result["cache_hit"] = True
+                result["elapsed_seconds"] = 0.0
+                return result
+
+    started = perf_counter()
+    try:
+        adapter = adapter_factory(**query)
+        pair = adapter.load_pair_with_records()
+        analysis = analyze_observations(pair.epoch_a, pair.epoch_b)
+        comparison = analysis["comparison"]
+        candidates = analysis["candidates"]
+        shape = tuple(pair.epoch_a.image.shape)
+        result = {
+            "band": band,
+            "status": comparison["status"],
+            "query": query,
+            "epochs": [record.observation_id for record in pair.records],
+            "candidate_count": len(candidates),
+            "screened_count": len(analysis["screened_candidates"]),
+            "quality": {
+                "valid_pixel_fraction": [pair.epoch_a.metadata.get("valid_pixel_fraction"), pair.epoch_b.metadata.get("valid_pixel_fraction")],
+                "bad_pixel_fraction": [pair.epoch_a.metadata.get("bad_pixel_fraction"), pair.epoch_b.metadata.get("bad_pixel_fraction")],
+                "registration_error": comparison.get("registration_error"),
+                "sky_overlap_fraction": comparison.get("sky_overlap_fraction"),
+            },
+            "candidates": candidates,
+            "screened_candidates": analysis["screened_candidates"],
+            "_anchors": [
+                {"band": band, "candidate_id": candidate.get("candidate_id", "candidate"), "position": anchor}
+                for candidate in candidates
+                if (anchor := _candidate_anchor(candidate, shape)) is not None
+            ],
+            "elapsed_seconds": round(perf_counter() - started, 3),
+            "cache_hit": False,
+        }
+    except (ArchiveAdapterError, ObservationValidationError, ValueError) as error:
+        result = {
+            "band": band,
+            "status": "ERROR",
+            "query": query,
+            "epochs": [],
+            "candidate_count": 0,
+            "screened_count": 0,
+            "quality": {},
+            "candidates": [],
+            "screened_candidates": [],
+            "_anchors": [],
+            "elapsed_seconds": round(perf_counter() - started, 3),
+            "cache_hit": False,
+            "error": str(error),
+        }
+    if cache_enabled and result["status"] != "ERROR":
+        with _EVIDENCE_CACHE_LOCK:
+            _EVIDENCE_CACHE[cache_key] = (monotonic(), deepcopy(result))
+    return result
+
+
 def build_spherex_evidence_graph(
     target: dict[str, float],
     bands: list[str],
@@ -106,99 +186,40 @@ def build_spherex_evidence_graph(
     edges: list[dict[str, Any]] = []
     results: list[dict[str, Any]] = []
 
-    for index, band in enumerate(requested_bands, start=1):
-        started = perf_counter()
+    queries = [
+        (band, {"ra_deg": ra_deg, "dec_deg": dec_deg, "radius_deg": radius_deg, "collection": collection, "band": band, "cutout_size_deg": cutout_size_deg, "max_results": max_results})
+        for band in requested_bands
+    ]
+    worker_count = min(6, max(1, len(queries)))
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        results = list(executor.map(lambda item: _run_band_analysis(item[0], item[1], adapter_factory), queries))
+
+    for index, result in enumerate(results, start=1):
+        band = result["band"]
+        status = result["status"]
         band_id = f"band:{index}:{band}"
-        band_node = _node(band_id, "band", band, status="PENDING")
+        band_node = _node(band_id, "band", band, status=status, cache_hit=result.get("cache_hit", False))
         nodes.append(band_node)
         edges.append(_edge(target_id, band_id, "queried", band=band))
-        query = {
-            "ra_deg": ra_deg,
-            "dec_deg": dec_deg,
-            "radius_deg": radius_deg,
-            "collection": collection,
-            "band": band,
-            "cutout_size_deg": cutout_size_deg,
-            "max_results": max_results,
-        }
-        try:
-            adapter = adapter_factory(**query)
-            pair = adapter.load_pair_with_records()
-            analysis = analyze_observations(pair.epoch_a, pair.epoch_b)
-            comparison = analysis["comparison"]
-            status = comparison["status"]
-            epochs = [record.observation_id for record in pair.records]
-            candidates = analysis["candidates"]
-            screened = analysis["screened_candidates"]
-            shape = tuple(pair.epoch_a.image.shape)
-            quality = {
-                "valid_pixel_fraction": [
-                    pair.epoch_a.metadata.get("valid_pixel_fraction"),
-                    pair.epoch_b.metadata.get("valid_pixel_fraction"),
-                ],
-                "bad_pixel_fraction": [
-                    pair.epoch_a.metadata.get("bad_pixel_fraction"),
-                    pair.epoch_b.metadata.get("bad_pixel_fraction"),
-                ],
-                "registration_error": comparison.get("registration_error"),
-                "sky_overlap_fraction": comparison.get("sky_overlap_fraction"),
-            }
-            result = {
-                "band": band,
-                "status": status,
-                "query": query,
-                "epochs": epochs,
-                "candidate_count": len(candidates),
-                "screened_count": len(screened),
-                "quality": quality,
-                "candidates": candidates,
-                "screened_candidates": screened,
-                "_anchors": [
-                    {"band": band, "candidate_id": candidate.get("candidate_id", "candidate"), "position": anchor}
-                    for candidate in candidates
-                    if (anchor := _candidate_anchor(candidate, shape)) is not None
-                ],
-                "elapsed_seconds": round(perf_counter() - started, 3),
-            }
-            band_node["status"] = status
-            epoch_ids: list[str] = []
-            for epoch_index, epoch in enumerate(epochs):
-                epoch_id = f"epoch:{index}:{epoch_index}"
-                epoch_ids.append(epoch_id)
-                nodes.append(_node(epoch_id, "epoch", f"{band} / epoch {epoch_index + 1}", observation_id=epoch))
-                edges.append(_edge(band_id, epoch_id, "observed"))
-            quality_id = f"quality:{index}"
-            result_id = f"result:{index}"
-            nodes.append(_node(quality_id, "quality", f"Quality gate: {status}", status=status, quality=quality))
-            edges.append(_edge(band_id, quality_id, "guarded-by"))
-            result_label = f"{len(candidates)} promoted candidate(s)" if candidates else "0 candidates / null result"
-            nodes.append(_node(result_id, "result", result_label, candidate_count=len(candidates), screened_count=len(screened)))
-            edges.append(_edge(band_id, result_id, "measured" if candidates else "no-promoted-residual"))
-            for candidate_index, candidate in enumerate(candidates):
-                candidate_id = f"candidate:{index}:{candidate_index}"
-                nodes.append(_node(candidate_id, "candidate", candidate.get("candidate_id", f"candidate-{candidate_index + 1}"), classification=candidate.get("classification")))
-                edges.append(_edge(result_id, candidate_id, "promoted"))
-        except (ArchiveAdapterError, ObservationValidationError, ValueError) as error:
-            status = "ERROR"
-            result = {
-                "band": band,
-                "status": status,
-                "query": query,
-                "epochs": [],
-                "candidate_count": 0,
-                "screened_count": 0,
-                "quality": {},
-                "candidates": [],
-                "screened_candidates": [],
-                "_anchors": [],
-                "elapsed_seconds": round(perf_counter() - started, 3),
-                "error": str(error),
-            }
-            band_node["status"] = status
+        if status == "ERROR":
             error_id = f"error:{index}"
-            nodes.append(_node(error_id, "error", f"Archive error: {error}"))
+            nodes.append(_node(error_id, "error", f"Archive error: {result.get('error', 'unknown error')}"))
             edges.append(_edge(band_id, error_id, "failed"))
-        results.append(result)
+            continue
+        for epoch_index, epoch in enumerate(result["epochs"]):
+            epoch_id = f"epoch:{index}:{epoch_index}"
+            nodes.append(_node(epoch_id, "epoch", f"{band} / epoch {epoch_index + 1}", observation_id=epoch))
+            edges.append(_edge(band_id, epoch_id, "observed"))
+        quality_id = f"quality:{index}"
+        result_id = f"result:{index}"
+        nodes.append(_node(quality_id, "quality", f"Quality gate: {status}", status=status, quality=result["quality"]))
+        edges.append(_edge(band_id, quality_id, "guarded-by"))
+        nodes.append(_node(result_id, "result", f"{result['candidate_count']} promoted candidate(s)" if result["candidate_count"] else "0 candidates / null result", candidate_count=result["candidate_count"], screened_count=result["screened_count"]))
+        edges.append(_edge(band_id, result_id, "measured" if result["candidate_count"] else "no-promoted-residual"))
+        for candidate_index, candidate in enumerate(result["candidates"]):
+            candidate_id = f"candidate:{index}:{candidate_index}"
+            nodes.append(_node(candidate_id, "candidate", candidate.get("candidate_id", f"candidate-{candidate_index + 1}"), classification=candidate.get("classification")))
+            edges.append(_edge(result_id, candidate_id, "promoted"))
 
     ready = sum(item["status"] == "READY TO COMPARE" for item in results)
     caution = sum(item["status"] == "COMPARE WITH CAUTION" for item in results)
@@ -222,6 +243,7 @@ def build_spherex_evidence_graph(
             "bands_with_candidates": sum(item["candidate_count"] > 0 for item in results),
             "consistency_status": consistency["status"],
             "matched_candidate_groups": len(consistency["matched_groups"]),
+            "processing_mode": "parallel per-band analysis with 180-second metadata cache",
         },
         "bands": results,
         "cross_band_consistency": consistency,

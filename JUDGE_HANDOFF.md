@@ -10,7 +10,8 @@ This is the short, honest route a judge can use without reading the repository.
 4. Open `/provenance` to follow candidate → processing run → source → epochs → Comparison Guard.
 5. Open `/spherex` and use the prefilled coordinate to query two public SPHEREx epochs through IRSA. The real-data path displays archive metadata, quality coverage, bounded FITS previews, measurements, and provenance.
 6. Open `/parallax-x` and click **Run judge brief** with the prefilled target. Review which bands are ready, blocked, errored, or null results, then inspect the explicit cross-band consistency status before interpreting a candidate.
-7. Open `/validation` to see the five deterministic regression cases and their measured errors.
+7. Use **Copy review link** or **Export JSON** to hand the exact target query and measured evidence to another reviewer. Optional pilot feedback is persisted only when a reviewer submits it.
+8. Open `/validation` to see the five deterministic regression cases and their measured errors.
 
 ## What is scientifically claimed
 
