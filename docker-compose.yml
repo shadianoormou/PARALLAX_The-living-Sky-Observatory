@@ -38,7 +38,7 @@ services:
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=parallax;Username=parallax;Password=${POSTGRES_PASSWORD}"
       ScienceService__BaseUrl: http://science:8001/
       PARALLAX_APPLY_MIGRATIONS: "true"
-      PARALLAX_CORS_ORIGINS: http://localhost:3000
+      PARALLAX_CORS_ORIGINS: "${PARALLAX_CORS_ORIGINS:-http://localhost:3000}"
       PARALLAX_REQUIRE_API_KEY: "${PARALLAX_REQUIRE_API_KEY:-false}"
       PARALLAX_API_KEY: "${PARALLAX_API_KEY:-}"
     ports:
