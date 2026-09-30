@@ -1,6 +1,6 @@
 const { app, BrowserWindow, shell, session } = require('electron');
 
-const PRODUCTION_URL = 'https://parallax-living-sky-observatory.kitgiz-1946.chatgpt.site';
+const PRODUCTION_URL = 'https://parallax-the-living-sky-observatory.vercel.app';
 
 function createWindow() {
   const window = new BrowserWindow({
