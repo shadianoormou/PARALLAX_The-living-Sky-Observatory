@@ -2,6 +2,10 @@
 
 This is the short, honest route a judge can use without reading the repository.
 
+## Mission in 30 seconds
+
+PARALLAX X helps researchers and citizens triage possible moving or changing objects in repeated SPHEREx observations without confusing artifacts for discoveries. The visible workflow is: **Observe → Compare → Reject artifacts → Cross-band verify → Send to human review**. The outcome is an evidence-linked handoff that can be a candidate, a null result, or a screened artifact—not an unsupported discovery claim.
+
 ## Three-minute product path
 
 1. Open `/explore` and choose **Load demonstration field**. The synthetic field is labelled `DEMONSTRATION DATASET` and can be inspected with blink, split, difference, and residual views.

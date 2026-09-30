@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, Check, Network, RefreshCw, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, Check, Eye, GitCompareArrows, Network, RefreshCw, Send, ShieldCheck, ShieldX, Telescope } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { CommunityMetrics, ParallaxApiError, ResearchFeedbackMetrics, SpherexEvidenceGraph, parallaxApi } from '../../lib/parallax-api';
 
@@ -121,6 +121,7 @@ export function EvidenceGraphView() {
   }
 
   return <div className="space-y-6">
+    <MissionBrief />
     <section className="panel border-[var(--cyan)]/30 p-5 sm:p-7">
       <div className="flex flex-wrap items-start justify-between gap-5">
         <div className="max-w-2xl">
@@ -149,6 +150,46 @@ export function EvidenceGraphView() {
     {loading && <div className="panel p-8 text-sm text-[var(--muted)]">Archive job: <span className="mono text-[var(--cyan)]">{jobStatus ?? 'queued'}</span>. Reading public IRSA products and measuring each selected band independently…</div>}
     {report && <Report report={report} metrics={metrics} feedbackMetrics={feedbackMetrics} feedbackMessage={feedbackMessage} onFeedback={sendFeedback} onDownload={downloadEvidence} onDownloadCsv={downloadCsv} onCopyLink={() => void copyShareLink()} shareMessage={shareMessage} />}
   </div>;
+}
+
+const MISSION_STEPS = [
+  { number: '01', title: 'Observe', text: 'Read repeated SPHEREx observations with provenance attached.', icon: Eye },
+  { number: '02', title: 'Compare', text: 'Align epochs and measure motion or brightness change.', icon: GitCompareArrows },
+  { number: '03', title: 'Reject artifacts', text: 'Screen flags, noise, bad pixels, and registration failures.', icon: ShieldX },
+  { number: '04', title: 'Cross-band verify', text: 'Check whether the signal persists across independent bands.', icon: Telescope },
+  { number: '05', title: 'Send to human review', text: 'Hand an evidence bundle to a researcher or citizen reviewer.', icon: Send },
+] as const;
+
+function MissionBrief() {
+  return <section className="panel border-[var(--signal)]/35 bg-[linear-gradient(135deg,rgba(237,247,238,.04),rgba(91,214,196,.05))] p-5 sm:p-7" aria-labelledby="mission-brief-title">
+    <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="max-w-3xl">
+        <p className="eyebrow text-[var(--signal)]">MISSION / 30-SECOND BRIEF</p>
+        <h2 id="mission-brief-title" className="mt-3 text-2xl font-medium tracking-[-.03em] text-[var(--ink)] sm:text-3xl">Turn repeated sky observations into a trustworthy review queue.</h2>
+        <blockquote className="mt-4 border-l-2 border-[var(--signal)] pl-4 text-sm leading-7 text-[var(--muted)] sm:text-base">“PARALLAX X helps researchers and citizens triage possible moving or changing objects in repeated SPHEREx observations without confusing artifacts for discoveries.”</blockquote>
+      </div>
+      <span className="mono border border-[var(--signal)]/35 px-3 py-2 text-[9px] uppercase tracking-[.12em] text-[var(--signal)]">Problem → evidence → review</span>
+    </div>
+    <div className="mt-6 grid gap-3 border-y border-[var(--line)] py-4 sm:grid-cols-3">
+      <MissionFact label="THE PROBLEM" text="Repeated survey data can hide real change inside noise, detector artifacts, and mis-registration." />
+      <MissionFact label="WHO IT SERVES" text="Researchers need triage; citizens need a bounded, explainable way to inspect the same evidence." />
+      <MissionFact label="THE OUTCOME" text="A measured, provenance-linked handoff—candidate, null result, or artifact—for human review." />
+    </div>
+    <div className="mt-6" aria-label="PARALLAX X mission workflow">
+      <div className="mb-3 flex items-center justify-between gap-3"><p className="mono text-[9px] uppercase tracking-[.12em] text-[var(--quiet)]">THE REVIEW LOOP</p><p className="mono text-[9px] uppercase tracking-[.1em] text-[var(--cyan)]">No discovery claim without review</p></div>
+      <ol className="grid gap-2 md:grid-cols-5">
+        {MISSION_STEPS.map(({ number, title, text, icon: Icon }) => <li key={title} className="relative border border-[var(--line)] bg-[var(--surface-2)] p-4 md:min-h-[150px]">
+          <div className="flex items-center justify-between gap-2"><span className="mono text-[9px] text-[var(--cyan)]">{number}</span><Icon size={16} aria-hidden="true" className="text-[var(--signal)]" /></div>
+          <h3 className="mt-4 text-sm font-medium text-[var(--ink)]">{title}</h3>
+          <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{text}</p>
+        </li>)}
+      </ol>
+    </div>
+  </section>;
+}
+
+function MissionFact({ label, text }: { label: string; text: string }) {
+  return <div className="border-l border-[var(--line-strong)] pl-3"><p className="mono text-[9px] uppercase tracking-[.1em] text-[var(--cyan)]">{label}</p><p className="mt-2 text-xs leading-5 text-[var(--muted)]">{text}</p></div>;
 }
 
 function Report({ report, metrics, feedbackMetrics, feedbackMessage, onFeedback, onDownload, onDownloadCsv, onCopyLink, shareMessage }: { report: SpherexEvidenceGraph; metrics: CommunityMetrics | null; feedbackMetrics: ResearchFeedbackMetrics | null; feedbackMessage: string | null; onFeedback: (signal: 'useful' | 'unclear' | 'would-share') => void; onDownload: () => void; onDownloadCsv: () => void; onCopyLink: () => void; shareMessage: string | null }) {
