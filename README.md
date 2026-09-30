@@ -255,6 +255,7 @@ AI-assisted tools were used during software development and copy editing. NASA/S
 - [Architecture](./ARCHITECTURE.md)
 - [Setup and operations](./SETUP.md)
 - [Demo script](./DEMO_SCRIPT.md)
+- [NASA submission package](./NASA_SUBMISSION_PACKAGE.md)
 - [Judge handoff](./JUDGE_HANDOFF.md)
 - [Final release checklist](./FINAL_RELEASE_CHECKLIST.md)
 - [Screenshot capture notes](./docs/screenshots.md)
