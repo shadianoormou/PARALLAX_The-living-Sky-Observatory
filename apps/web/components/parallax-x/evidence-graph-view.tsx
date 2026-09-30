@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { AlertTriangle, Check, Eye, GitCompareArrows, Network, RefreshCw, Send, ShieldCheck, ShieldX, Telescope } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useLanguage } from '../language-context';
+import { useMode } from '../mode-context';
 import { CommunityMetrics, ParallaxApiError, ResearchFeedbackMetrics, SpherexEvidenceBand, SpherexEvidenceGraph, parallaxApi } from '../../lib/parallax-api';
 
 const BAND_OPTIONS = ['SPHEREx-D3', 'SPHEREx-D4', 'SPHEREx-D5', 'SPHEREx-D6'];
@@ -19,6 +21,9 @@ export function EvidenceGraphView() {
   const [feedbackMetrics, setFeedbackMetrics] = useState<ResearchFeedbackMetrics | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
+  const [publicBundleMessage, setPublicBundleMessage] = useState<string | null>(null);
+  const { language, t } = useLanguage();
+  const { audience } = useMode();
 
   useEffect(() => {
     void parallaxApi.getCommunityMetrics().then(setMetrics).catch(() => setMetrics(null));
@@ -109,6 +114,18 @@ export function EvidenceGraphView() {
     }
   }
 
+  async function publishPublicBundle() {
+    if (!report) return;
+    try {
+      const created = await parallaxApi.createPublicEvidenceBundle('PARALLAX X evidence handoff', { exportedAtUtc: new Date().toISOString(), interpretation: 'Evidence bundle for review; not a discovery claim.', report });
+      const url = `${window.location.origin}${created.publicPath}`;
+      try { await navigator.clipboard.writeText(url); } catch { /* The URL remains visible for manual copy. */ }
+      setPublicBundleMessage(`Public read-only link ready: ${url}`);
+    } catch (caught) {
+      setPublicBundleMessage(caught instanceof Error ? caught.message : 'Public bundle could not be created.');
+    }
+  }
+
   async function sendFeedback(signal: 'useful' | 'unclear' | 'would-share') {
     setFeedbackMessage(null);
     try {
@@ -124,6 +141,7 @@ export function EvidenceGraphView() {
   return <div className="space-y-6">
     <MissionBrief />
     <JudgeBrief onRun={() => void run()} loading={loading} />
+    <GlobalAccessPanel language={language} audience={audience} t={t} />
     <section className="panel border-[var(--cyan)]/30 p-5 sm:p-7">
       <div className="flex flex-wrap items-start justify-between gap-5">
         <div className="max-w-2xl">
@@ -150,9 +168,19 @@ export function EvidenceGraphView() {
 
     {!report && !loading && <section className="grid gap-4 md:grid-cols-3"><InfoCard label="1 / Query" text="One sky position, repeated across selected SPHEREx bands." /><InfoCard label="2 / Gate" text="Every epoch pair is checked for dimensions, flags, overlap, and registration." /><InfoCard label="3 / Review" text="The result preserves provenance, screened residuals, and honest null results." /></section>}
     {loading && <div className="panel p-8 text-sm text-[var(--muted)]">Archive job: <span className="mono text-[var(--cyan)]">{jobStatus ?? 'queued'}</span>. Reading public IRSA products and measuring each selected band independently…</div>}
-    {report && <Report report={report} metrics={metrics} feedbackMetrics={feedbackMetrics} feedbackMessage={feedbackMessage} onFeedback={sendFeedback} onDownload={downloadEvidence} onDownloadCsv={downloadCsv} onCopyLink={() => void copyShareLink()} shareMessage={shareMessage} />}
+    {report && <Report report={report} metrics={metrics} feedbackMetrics={feedbackMetrics} feedbackMessage={feedbackMessage} onFeedback={sendFeedback} onDownload={downloadEvidence} onDownloadCsv={downloadCsv} onCopyLink={() => void copyShareLink()} onPublishPublicBundle={() => void publishPublicBundle()} shareMessage={shareMessage} publicBundleMessage={publicBundleMessage} />}
   </div>;
 }
+
+function GlobalAccessPanel({ language, audience, t }: { language: 'en' | 'bn'; audience: 'citizen' | 'teacher' | 'researcher'; t: (key: string, fallback: string) => string }) {
+  return <section className="panel border-[var(--cyan)]/30 p-5 sm:p-7" aria-labelledby="global-access-title">
+    <div className="flex flex-wrap items-start justify-between gap-4"><div className="max-w-3xl"><p className="eyebrow text-[var(--cyan)]">{t('global.eyebrow', 'GLOBAL ACCESS / DESIGNED FOR REACH')}</p><h2 id="global-access-title" className="mt-3 text-2xl font-medium tracking-[-.03em] text-[var(--ink)]">{t('global.title', 'Built for review across borders.')}</h2><p className="mt-3 text-sm leading-7 text-[var(--muted)]">{t('global.body', 'PARALLAX X connects different languages, professions, and assistive technologies to the same traceable evidence handoff—not a claim of global adoption.')}</p></div><span className="mono border border-[var(--cyan)]/30 px-3 py-2 text-[9px] uppercase tracking-[.1em] text-[var(--cyan)]">{language === 'bn' ? 'বাংলা + English' : 'English + বাংলা'}</span></div>
+    <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><AccessCard label="LANGUAGE / ভাষা" text="English + বাংলা" /><AccessCard label="AUDIENCE / ব্যবহারকারী" text={`${audience} · ${t('global.modes', 'Citizen · Teacher · Researcher')}`} /><AccessCard label="SHARING / শেয়ার" text={t('global.share', 'Public read-only evidence link')} /><AccessCard label="ACCESS / প্রবেশযোগ্যতা" text={t('global.accessibility', 'Keyboard · contrast · screen reader')} /></div>
+    <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-[var(--line)] pt-5"><Link href="/classroom" className="focus-ring inline-flex border border-[var(--cyan)]/40 px-4 py-3 mono text-[9px] uppercase tracking-[.1em] text-[var(--cyan)]">{t('global.pilot', 'Open pilot dashboard')}</Link><span className="text-xs text-[var(--quiet)]">Broad region counts are self-reported and aggregated; exact location is never collected.</span></div>
+  </section>;
+}
+
+function AccessCard({ label, text }: { label: string; text: string }) { return <div className="border border-[var(--line)] bg-[var(--surface-2)] p-4"><p className="mono text-[9px] uppercase tracking-[.1em] text-[var(--quiet)]">{label}</p><p className="mt-3 text-xs leading-5 text-[var(--ink)]">{text}</p></div>; }
 
 const MISSION_STEPS = [
   { number: '01', title: 'Observe', text: 'Read repeated SPHEREx observations with provenance attached.', icon: Eye },
@@ -211,15 +239,16 @@ function BriefStep({ number, title, text }: { number: string; title: string; tex
   return <li className="border border-[var(--line)] bg-[var(--surface-2)] p-4"><span className="mono text-[9px] text-[var(--cyan)]">{number}</span><h3 className="mt-3 text-sm font-medium text-[var(--ink)]">{title}</h3><p className="mt-2 text-xs leading-5 text-[var(--muted)]">{text}</p></li>;
 }
 
-function Report({ report, metrics, feedbackMetrics, feedbackMessage, onFeedback, onDownload, onDownloadCsv, onCopyLink, shareMessage }: { report: SpherexEvidenceGraph; metrics: CommunityMetrics | null; feedbackMetrics: ResearchFeedbackMetrics | null; feedbackMessage: string | null; onFeedback: (signal: 'useful' | 'unclear' | 'would-share') => void; onDownload: () => void; onDownloadCsv: () => void; onCopyLink: () => void; shareMessage: string | null }) {
+function Report({ report, metrics, feedbackMetrics, feedbackMessage, onFeedback, onDownload, onDownloadCsv, onCopyLink, onPublishPublicBundle, shareMessage, publicBundleMessage }: { report: SpherexEvidenceGraph; metrics: CommunityMetrics | null; feedbackMetrics: ResearchFeedbackMetrics | null; feedbackMessage: string | null; onFeedback: (signal: 'useful' | 'unclear' | 'would-share') => void; onDownload: () => void; onDownloadCsv: () => void; onCopyLink: () => void; onPublishPublicBundle: () => void; shareMessage: string | null; publicBundleMessage: string | null }) {
   const summary = report.summary;
   return <div className="space-y-6">
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6"><Metric label="Bands" value={String(summary.bands_requested)} tone="cyan" /><Metric label="Ready" value={String(summary.bands_ready)} tone="signal" /><Metric label="Caution / blocked" value={`${summary.bands_caution} / ${summary.bands_blocked}`} tone={summary.bands_blocked ? 'amber' : 'cyan'} /><Metric label="Errors" value={String(summary.bands_error)} tone={summary.bands_error ? 'amber' : 'signal'} /><Metric label="Candidates" value={String(summary.total_candidates)} tone="signal" /><Metric label="Consistency" value={summary.consistency_status.replaceAll('_', ' ')} tone={summary.matched_candidate_groups ? 'signal' : 'cyan'} /></div>
     <JudgeConclusion report={report} />
     <section className="panel p-5 sm:p-7">
-      <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="eyebrow">TARGET EVIDENCE CHAIN</p><h2 className="mt-3 text-xl font-medium text-[var(--ink)]">{report.target.ra_deg.toFixed(5)}°, {report.target.dec_deg.toFixed(5)}°</h2><p className="mt-2 text-xs text-[var(--quiet)]">{report.summary.processing_mode} · {report.summary.elapsed_seconds.toFixed(1)}s total · {report.summary.cache_hits} cache hit(s)</p></div><div className="flex flex-wrap items-center gap-2"><span className="mono border border-[var(--line)] px-3 py-2 text-[9px] uppercase tracking-[.1em] text-[var(--quiet)]">{report.graph.nodes.length} nodes / {report.graph.edges.length} links</span><button type="button" onClick={onCopyLink} className="focus-ring border border-[var(--line-strong)] px-3 py-2 mono text-[9px] uppercase tracking-[.1em] text-[var(--cyan)]">Copy review link</button><button type="button" onClick={onDownload} className="focus-ring bg-[var(--cyan)] px-3 py-2 mono text-[9px] uppercase tracking-[.1em] text-[var(--void)]">Export JSON</button><button type="button" onClick={onDownloadCsv} className="focus-ring border border-[var(--line-strong)] px-3 py-2 mono text-[9px] uppercase tracking-[.1em] text-[var(--cyan)]">Export CSV</button></div></div>
+      <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="eyebrow">TARGET EVIDENCE CHAIN</p><h2 className="mt-3 text-xl font-medium text-[var(--ink)]">{report.target.ra_deg.toFixed(5)}°, {report.target.dec_deg.toFixed(5)}°</h2><p className="mt-2 text-xs text-[var(--quiet)]">{report.summary.processing_mode} · {report.summary.elapsed_seconds.toFixed(1)}s total · {report.summary.cache_hits} cache hit(s)</p></div><div className="flex flex-wrap items-center gap-2"><span className="mono border border-[var(--line)] px-3 py-2 text-[9px] uppercase tracking-[.1em] text-[var(--quiet)]">{report.graph.nodes.length} nodes / {report.graph.edges.length} links</span><button type="button" onClick={onCopyLink} className="focus-ring border border-[var(--line-strong)] px-3 py-2 mono text-[9px] uppercase tracking-[.1em] text-[var(--cyan)]">Copy review link</button><button type="button" onClick={onPublishPublicBundle} className="focus-ring border border-[var(--signal)]/50 px-3 py-2 mono text-[9px] uppercase tracking-[.1em] text-[var(--signal)]">Publish read-only</button><button type="button" onClick={onDownload} className="focus-ring bg-[var(--cyan)] px-3 py-2 mono text-[9px] uppercase tracking-[.1em] text-[var(--void)]">Export JSON</button><button type="button" onClick={onDownloadCsv} className="focus-ring border border-[var(--line-strong)] px-3 py-2 mono text-[9px] uppercase tracking-[.1em] text-[var(--cyan)]">Export CSV</button></div></div>
       <div className="mt-6 space-y-3">{report.bands.map((item) => <BandCard key={item.band} item={item} />)}</div>
       {shareMessage && <p className="mt-4 text-xs text-[var(--signal)]">{shareMessage}</p>}
+      {publicBundleMessage && <p className="mt-2 break-all text-xs text-[var(--signal)]" role="status">{publicBundleMessage}</p>}
     </section>
     <section className="panel border-[var(--cyan)]/25 p-5 sm:p-7"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="eyebrow text-[var(--cyan)]">CROSS-BAND CONSISTENCY</p><h2 className="mt-3 text-xl font-medium text-[var(--ink)]">{report.cross_band_consistency.status.replaceAll('_', ' ')}</h2></div><span className="mono border border-[var(--line)] px-3 py-2 text-[9px] uppercase tracking-[.1em] text-[var(--quiet)]">{report.cross_band_consistency.matched_groups.length} matched group(s)</span></div><p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--muted)]">{report.cross_band_consistency.method}</p>{report.cross_band_consistency.matched_groups.length > 0 && <div className="mt-5 space-y-2">{report.cross_band_consistency.matched_groups.map((group) => <div key={group.group_id} className="border border-[var(--signal)]/30 bg-[var(--signal-soft)] p-4 text-xs text-[var(--muted)]"><span className="mono text-[var(--signal)]">{group.group_id}</span><span className="ml-3 text-[var(--ink)]">{group.bands.join(' + ')}</span><span className="ml-3">{group.candidate_ids.join(', ')}</span></div>)}</div>}</section>
     <ImpactPath metrics={metrics} />

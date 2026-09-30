@@ -17,6 +17,9 @@ This is the Phase 8 release gate. It records what was verified locally and what 
 - [x] PARALLAX X exposes a multi-band SPHEREx evidence graph with per-band quality gates, epochs, candidates, null results, and explicit interpretation limits.
 - [x] The judge flow exposes cautious cross-band consistency associations and a measured impact path without inventing adoption numbers.
 - [x] Researcher handoff supports shareable query links, JSON evidence export, and persisted opt-in pilot feedback.
+- [x] Global usability surface supports English / বাংলা core navigation, Citizen / Teacher / Researcher modes, keyboard-first skip navigation, large text, high contrast, and screen-reader labels.
+- [x] Public evidence bundles are immutable, read-only, SQL-backed, machine-readable, and expiration-bounded.
+- [x] Pilot dashboard aggregates optional language, broad region, role, and feedback signals without collecting names, email, or exact location.
 - [x] Multi-band evidence processing is bounded-parallel and uses a short-lived cache for repeat review without caching archive errors.
 - [x] Best-technology path supports asynchronous job polling, archive retry/backoff, active-job rate limiting, WCS-first association with labeled pixel fallback, timing/cache benchmarks, and JSON/CSV export.
 - [x] Privacy-preserving community adoption metrics are persisted and displayed from real classification rows.

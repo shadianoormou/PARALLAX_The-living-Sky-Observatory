@@ -150,6 +150,47 @@ public static class EndpointMappings
             return Results.Ok(new ConsensusReportResponse(items.Length, items.Sum(item => item.TotalVotes), agreements.Length, agreements.Length == 0 ? 0 : agreements.Average(), items));
         });
 
+        app.MapPost("/api/public-evidence-bundles", async (PublicEvidenceBundleRequest body, HttpRequest request, ParallaxDbContext db, CancellationToken cancellationToken) =>
+        {
+            var title = body.Title.Trim();
+            if (title.Length is < 3 or > 160 || body.Payload.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["bundle"] = ["A title and JSON payload are required."] });
+            if (body.Payload.GetRawText().Length > 2_000_000)
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["payload"] = ["Evidence bundles must be smaller than 2 MB."] });
+
+            var createdAt = DateTime.UtcNow;
+            var expiresAt = body.ExpiresAtUtc is { } requested && requested > createdAt && requested <= createdAt.AddDays(90)
+                ? requested.ToUniversalTime()
+                : createdAt.AddDays(30);
+            var bundleId = Guid.NewGuid();
+            db.AuditEntries.Add(new AuditEntry
+            {
+                Id = Guid.NewGuid(),
+                Action = "public-evidence-bundle",
+                ActorKey = DemoUserKey(request),
+                EntityType = "PublicEvidenceBundle",
+                EntityId = bundleId,
+                MetadataJson = JsonSerializer.Serialize(new { bundleId, title, payload = body.Payload, createdAtUtc = createdAt, expiresAtUtc = expiresAt }),
+                CreatedAtUtc = createdAt,
+            });
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.Ok(new PublicEvidenceBundleCreatedResponse(bundleId, $"/evidence/{bundleId}", createdAt, expiresAt));
+        });
+
+        app.MapGet("/api/public-evidence-bundles/{id:guid}", async (Guid id, ParallaxDbContext db, CancellationToken cancellationToken) =>
+        {
+            var entry = await db.AuditEntries.AsNoTracking().SingleOrDefaultAsync(item => item.Action == "public-evidence-bundle" && item.EntityId == id, cancellationToken);
+            if (entry is null) return Results.NotFound();
+            var stored = ParseJson(entry.MetadataJson);
+            if (stored.ValueKind != JsonValueKind.Object || !stored.TryGetProperty("expiresAtUtc", out var expiresElement) || !expiresElement.TryGetDateTime(out var expiresAt))
+                return Results.Problem("The evidence bundle is malformed.", statusCode: StatusCodes.Status500InternalServerError);
+            if (expiresAt <= DateTime.UtcNow) return Results.StatusCode(StatusCodes.Status410Gone);
+            var title = stored.TryGetProperty("title", out var titleElement) ? titleElement.GetString() ?? "Public evidence bundle" : "Public evidence bundle";
+            var payload = stored.TryGetProperty("payload", out var payloadElement) ? payloadElement : ParseJson("{}");
+            var createdAt = stored.TryGetProperty("createdAtUtc", out var createdElement) && createdElement.TryGetDateTime(out var parsedCreated) ? parsedCreated : entry.CreatedAtUtc;
+            return Results.Ok(new PublicEvidenceBundleResponse(id, title, payload, createdAt, expiresAt));
+        });
+
         app.MapGet("/api/research-feedback/metrics", async (ParallaxDbContext db, CancellationToken cancellationToken) =>
         {
             var entries = await db.AuditEntries.AsNoTracking().Where(item => item.Action == "research-feedback").ToListAsync(cancellationToken);
@@ -168,9 +209,25 @@ public static class EndpointMappings
                 .ThenBy(group => group.Key)
                 .Select(group => new CommunityLabelCount(group.Key, group.Count()))
                 .ToArray();
+            var languages = metadata
+                .Select(item => item.Data.TryGetProperty("language", out var language) ? language.GetString() : null)
+                .Where(language => !string.IsNullOrWhiteSpace(language))
+                .GroupBy(language => language!, StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(group => group.Count())
+                .ThenBy(group => group.Key)
+                .Select(group => new CommunityLabelCount(group.Key, group.Count()))
+                .ToArray();
+            var regions = metadata
+                .Select(item => item.Data.TryGetProperty("region", out var region) ? region.GetString() : null)
+                .Where(region => !string.IsNullOrWhiteSpace(region))
+                .GroupBy(region => region!, StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(group => group.Count())
+                .ThenBy(group => group.Key)
+                .Select(group => new CommunityLabelCount(group.Key, group.Count()))
+                .ToArray();
             var uniqueParticipants = metadata.Select(item => item.ActorKey).Distinct(StringComparer.OrdinalIgnoreCase).Count();
             var status = uniqueParticipants >= 5 ? "minimum-reached" : uniqueParticipants > 0 ? "in-progress" : "not-started";
-            return Results.Ok(new ResearchFeedbackMetricsResponse(metadata.Length, signals, uniqueParticipants, roles, 5, 10, status, metadata.Length == 0 ? null : metadata.Min(item => item.CreatedAtUtc), metadata.Length == 0 ? null : metadata.Max(item => item.CreatedAtUtc)));
+            return Results.Ok(new ResearchFeedbackMetricsResponse(metadata.Length, signals, uniqueParticipants, roles, languages, regions, 5, 10, status, metadata.Length == 0 ? null : metadata.Min(item => item.CreatedAtUtc), metadata.Length == 0 ? null : metadata.Max(item => item.CreatedAtUtc)));
         });
 
         app.MapGet("/api/validation", async (IScienceServiceClient science, CancellationToken cancellationToken) =>
@@ -198,15 +255,18 @@ public static class EndpointMappings
         {
             var signal = body.Signal.Trim().ToLowerInvariant();
             var role = body.Role.Trim().ToLowerInvariant();
-            if (body.Surface.Trim().ToLowerInvariant() != "parallax-x" || signal is not ("useful" or "unclear" or "would-share") || role is not ("student" or "teacher" or "researcher"))
-                return Results.ValidationProblem(new Dictionary<string, string[]> { ["signal"] = ["Use useful, unclear, or would-share feedback and a student, teacher, or researcher role."] });
+            var language = body.Language.Trim().ToLowerInvariant();
+            var region = body.Region.Trim().ToLowerInvariant();
+            var validRegions = new[] { "unspecified", "south-asia", "north-america", "europe", "latin-america", "africa", "oceania", "other" };
+            if (body.Surface.Trim().ToLowerInvariant() != "parallax-x" || signal is not ("useful" or "unclear" or "would-share") || role is not ("student" or "teacher" or "researcher") || language is not ("en" or "bn") || !validRegions.Contains(region))
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["signal"] = ["Use a valid signal, role, language, and broad region category."] });
             db.AuditEntries.Add(new AuditEntry
             {
                 Id = Guid.NewGuid(),
                 Action = "research-feedback",
                 ActorKey = DemoUserKey(request),
                 EntityType = "ResearchHandoff",
-                MetadataJson = JsonSerializer.Serialize(new { surface = "parallax-x", signal, role, notes = body.Notes?.Trim() }),
+                MetadataJson = JsonSerializer.Serialize(new { surface = "parallax-x", signal, role, language, region, notes = body.Notes?.Trim() }),
                 CreatedAtUtc = DateTime.UtcNow,
             });
             await db.SaveChangesAsync(cancellationToken);

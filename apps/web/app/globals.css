@@ -21,6 +21,8 @@
 * { box-sizing: border-box; }
 html { background: var(--void); scroll-behavior: smooth; }
 body { margin: 0; background: var(--void); color: var(--ink); font-family: 'Manrope', sans-serif; }
+body[data-contrast='high'] { --ink: #ffffff; --muted: #e1ecef; --quiet: #b9c9cd; --line: rgba(255,255,255,.42); --line-strong: rgba(255,255,255,.72); --signal: #d7ff8a; --cyan: #a8fffb; }
+body[data-font-scale='large'] { font-size: 112.5%; }
 a { color: inherit; text-decoration: none; }
 button, a { -webkit-tap-highlight-color: transparent; }
 ::selection { background: var(--signal); color: var(--void); }

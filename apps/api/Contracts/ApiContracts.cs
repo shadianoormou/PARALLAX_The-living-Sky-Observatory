@@ -152,18 +152,40 @@ public sealed record ResearchFeedbackRequest(
     [property: JsonPropertyName("surface")] string Surface,
     [property: JsonPropertyName("signal")] string Signal,
     [property: JsonPropertyName("notes")] string? Notes = null,
-    [property: JsonPropertyName("role")] string Role = "researcher");
+    [property: JsonPropertyName("role")] string Role = "researcher",
+    [property: JsonPropertyName("language")] string Language = "en",
+    [property: JsonPropertyName("region")] string Region = "unspecified");
 
 public sealed record ResearchFeedbackMetricsResponse(
     int TotalFeedback,
     IReadOnlyList<CommunityLabelCount> Signals,
     int UniqueParticipants = 0,
     IReadOnlyList<CommunityLabelCount>? Roles = null,
+    IReadOnlyList<CommunityLabelCount>? Languages = null,
+    IReadOnlyList<CommunityLabelCount>? Regions = null,
     int MinimumParticipants = 5,
     int RecommendedParticipants = 10,
     string PilotStatus = "not-started",
     DateTime? FirstFeedbackAtUtc = null,
     DateTime? LastFeedbackAtUtc = null);
+
+public sealed record PublicEvidenceBundleRequest(
+    [property: JsonPropertyName("title")] string Title,
+    [property: JsonPropertyName("payload")] JsonElement Payload,
+    [property: JsonPropertyName("expires_at_utc")] DateTime? ExpiresAtUtc = null);
+
+public sealed record PublicEvidenceBundleCreatedResponse(
+    Guid BundleId,
+    string PublicPath,
+    DateTime CreatedAtUtc,
+    DateTime ExpiresAtUtc);
+
+public sealed record PublicEvidenceBundleResponse(
+    Guid BundleId,
+    string Title,
+    JsonElement Payload,
+    DateTime CreatedAtUtc,
+    DateTime ExpiresAtUtc);
 
 public sealed record ConsensusReportItem(
     Guid CandidateId,

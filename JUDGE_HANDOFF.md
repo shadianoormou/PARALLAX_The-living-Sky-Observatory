@@ -14,8 +14,9 @@ PARALLAX X helps researchers and citizens triage possible moving or changing obj
 4. Open `/provenance` to follow candidate → processing run → source → epochs → Comparison Guard.
 5. Open `/spherex` and use the prefilled coordinate to query two public SPHEREx epochs through IRSA. The real-data path displays archive metadata, quality coverage, bounded FITS previews, measurements, and provenance.
 6. Open `/parallax-x` and use the **2-minute Judge Brief** with the prefilled real SPHEREx/IRSA target. The UI tells the complete story in order: before observation → quality gate → residual/null result → conclusion. The result uses a large canonical label (`MULTI-BAND CONSISTENT`, `SINGLE-BAND ONLY`, `COMPARISON BLOCKED`, or `NO PROMOTED RESIDUAL`) and ends with an explicit next action for the reviewer.
-7. Use **Copy review link**, **Export JSON**, or **Export CSV** to hand the exact target query and measured evidence to another reviewer. Optional pilot feedback is persisted only when a reviewer submits it.
-8. Open `/classroom` for the five-step lesson mode. Set a unique anonymous participant code, choose student/teacher/researcher, submit one pilot signal, and inspect the 5–10 participant progress, role mix, and reviewer consensus report. Export the combined impact report for the submission folder.
+7. Use **Copy review link**, **Export JSON**, **Export CSV**, or **Publish read-only** to hand the exact target query and measured evidence to another reviewer. The public bundle is immutable, SQL-backed, machine-readable, and expires automatically.
+8. Use the header controls to switch **English / বাংলা**, choose **Citizen / Teacher / Researcher** mode, and enable **A+ large text** or **HC high contrast**. The route includes a skip link, keyboard-visible focus, and labelled controls for assistive technology.
+9. Open `/classroom` for the five-step lesson mode. Set a unique anonymous participant code, choose student/teacher/researcher, select an optional broad region, submit one pilot signal, and inspect the language/region/role aggregate dashboard, 5–10 participant progress, and reviewer consensus report. Export the combined impact report for the submission folder.
 9. Open `/validation` to see the five deterministic regression cases and their measured errors.
 
 ## What is scientifically claimed
@@ -39,3 +40,4 @@ PARALLAX X helps researchers and citizens triage possible moving or changing obj
 - FITS source URL, retrieval timestamp, checksum, WCS summary, and release metadata.
 - The distinction between promoted candidates, screened artifacts, and human classifications.
 - The distinction between persisted pilot evidence and claimed adoption: an empty or partial pilot report is an honest result.
+- “Global” means globally usable design and an aggregate pilot instrument; it does not mean global adoption. Language, broad region, role, and signal counts remain empty or partial until real people submit feedback.

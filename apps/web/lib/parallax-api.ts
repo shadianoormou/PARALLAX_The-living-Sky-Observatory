@@ -130,11 +130,25 @@ export type ResearchFeedbackMetrics = {
   signals: Array<{ label: string; count: number }>;
   uniqueParticipants: number;
   roles: Array<{ label: string; count: number }>;
+  languages: Array<{ label: string; count: number }>;
+  regions: Array<{ label: string; count: number }>;
   minimumParticipants: number;
   recommendedParticipants: number;
   pilotStatus: 'not-started' | 'in-progress' | 'minimum-reached' | string;
   firstFeedbackAtUtc: string | null;
   lastFeedbackAtUtc: string | null;
+};
+
+export type PublicEvidenceBundleCreated = {
+  bundleId: string;
+  publicPath: string;
+  createdAtUtc: string;
+  expiresAtUtc: string;
+};
+
+export type PublicEvidenceBundle = PublicEvidenceBundleCreated & {
+  title: string;
+  payload: JsonObject;
 };
 
 export type ConsensusReportItem = {
@@ -389,10 +403,14 @@ export const parallaxApi = {
   getPassport: () => fetchJson<Passport>('/api/passport'),
   getCommunityMetrics: () => fetchJson<CommunityMetrics>('/api/community/metrics'),
   getResearchFeedbackMetrics: () => fetchJson<ResearchFeedbackMetrics>('/api/research-feedback/metrics'),
-  submitResearchFeedback: (signal: 'useful' | 'unclear' | 'would-share', notes?: string, role: 'student' | 'teacher' | 'researcher' = 'researcher') => fetchJson<{ signal: string; recordedAtUtc: string }>('/api/research-feedback', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ surface: 'parallax-x', signal, notes, role }),
+  submitResearchFeedback: (signal: 'useful' | 'unclear' | 'would-share', notes?: string, role: 'student' | 'teacher' | 'researcher' = 'researcher', language: 'en' | 'bn' = 'en', region = 'unspecified') => fetchJson<{ signal: string; recordedAtUtc: string }>('/api/research-feedback', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ surface: 'parallax-x', signal, notes, role, language, region }),
   }),
   getConsensusReport: () => fetchJson<ConsensusReport>('/api/community/consensus-report'),
+  createPublicEvidenceBundle: (title: string, payload: JsonObject) => fetchJson<PublicEvidenceBundleCreated>('/api/public-evidence-bundles', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, payload }),
+  }),
+  getPublicEvidenceBundle: (id: string) => fetchJson<PublicEvidenceBundle>(`/api/public-evidence-bundles/${encodeURIComponent(id)}`),
   completeLearningModule: (moduleKey: string) => fetchJson<Passport>(`/api/passport/modules/${moduleKey}`, { method: 'POST' }),
   getValidation: () => fetchJson<ValidationReport>('/api/validation'),
   searchSpherex: (request: SpherexArchiveRequest) => fetchJson<SpherexArchiveSearch>('/api/archive/spherex/search', {
