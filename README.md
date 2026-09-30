@@ -10,13 +10,15 @@ It is designed around one rule: **a candidate is not a discovery**.
 
 - **Public observatory:** [parallax-living-sky-observatory.kitgiz-1946.chatgpt.site](https://parallax-living-sky-observatory.kitgiz-1946.chatgpt.site)
 - **Vercel frontend:** [parallax-the-living-sky-observatory.vercel.app](https://parallax-the-living-sky-observatory.vercel.app)
+- **Live API:** [parallax-api-x19b.onrender.com](https://parallax-api-x19b.onrender.com) · [readiness](https://parallax-api-x19b.onrender.com/health/ready)
+- **Live science service:** [parallax-science.onrender.com](https://parallax-science.onrender.com/health)
 - **Judge Brief:** `/parallax-x`
 - **Guided investigation:** `/demo`
 - **Evidence explorer:** `/explore`
 - **Citizen review:** `/citizen-science`
 - **Classroom pilot:** `/classroom`
 
-The hosted judge build is a static, read-only presentation of the validated demo path. The full SQL-backed processing stack is available through Docker Compose for local or self-hosted deployment.
+The Vercel judge build is connected to the globally hosted Render API and PostgreSQL-backed processing stack. If the API is unavailable, the observatory falls back to a visibly labelled, read-only demonstration dataset; it never presents fallback content as a live persisted result.
 
 ## Download clients
 
@@ -231,7 +233,7 @@ The production-shaped API includes:
 - `/health`, `/health/ready`, structured trace IDs, and operational metrics.
 - CI and browser E2E coverage in the repository workflow.
 
-Hosted deployments still require platform-specific TLS, WAF/ingress, secret management, alerting, and a production signing/notarization setup for store distribution.
+The current hosted deployment uses Vercel for the web frontend and Render for the API, science service, and PostgreSQL database. Production hardening still includes platform-specific WAF/ingress, secret rotation, alerting, database retention, and a production signing/notarization setup for store distribution.
 
 ## Data, privacy, and disclosure
 
