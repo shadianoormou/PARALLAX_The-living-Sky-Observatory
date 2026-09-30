@@ -66,6 +66,14 @@ def test_comparison_guard_blocks_incompatible_frames() -> None:
     assert any("coordinate" in reason.lower() for reason in assessment["blocking_issues"])
 
 
+def test_comparison_guard_blocks_heavily_flagged_fields() -> None:
+    dataset = generate_synthetic_dataset()
+    flagged = {**dataset.epoch_b.metadata, "bad_pixel_fraction": 0.75}
+    assessment = assess_comparison_metadata(dataset.epoch_a.metadata, flagged)
+    assert assessment["status"] == "COMPARISON NOT RELIABLE"
+    assert any("flagged pixels" in reason for reason in assessment["blocking_issues"])
+
+
 def test_spectral_comparison_preserves_measurements_without_physical_labels() -> None:
     dataset = generate_synthetic_dataset()
     analysis = analyze_observations(dataset.epoch_a, dataset.epoch_b)

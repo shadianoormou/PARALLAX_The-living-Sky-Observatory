@@ -8,6 +8,8 @@ public interface IScienceServiceClient
 {
     Task<ScienceAnalysisResponse> AnalyzeAsync(ScienceProcessRequest request, CancellationToken cancellationToken);
     Task<JsonElement> RunValidationAsync(CancellationToken cancellationToken);
+    Task<JsonElement> SearchSpherexAsync(SpherexArchiveRequest request, CancellationToken cancellationToken);
+    Task<JsonElement> AnalyzeSpherexAsync(SpherexArchiveRequest request, CancellationToken cancellationToken);
 }
 
 public sealed class ScienceServiceClient(HttpClient httpClient, ILogger<ScienceServiceClient> logger) : IScienceServiceClient
@@ -34,6 +36,26 @@ public sealed class ScienceServiceClient(HttpClient httpClient, ILogger<ScienceS
         {
             logger.LogWarning("Science validation returned {StatusCode}: {Body}", response.StatusCode, body);
             throw new HttpRequestException($"Science validation returned {(int)response.StatusCode}: {body}");
+        }
+
+        using var document = JsonDocument.Parse(body);
+        return document.RootElement.Clone();
+    }
+
+    public Task<JsonElement> SearchSpherexAsync(SpherexArchiveRequest request, CancellationToken cancellationToken) =>
+        PostJsonAsync("archive/spherex/search", request, "SPHEREx archive search", cancellationToken);
+
+    public Task<JsonElement> AnalyzeSpherexAsync(SpherexArchiveRequest request, CancellationToken cancellationToken) =>
+        PostJsonAsync("archive/spherex/analyze", request, "SPHEREx archive analysis", cancellationToken);
+
+    private async Task<JsonElement> PostJsonAsync<T>(string path, T request, string operation, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsJsonAsync(path, request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogWarning("{Operation} returned {StatusCode}: {Body}", operation, response.StatusCode, body);
+            throw new HttpRequestException($"{operation} returned {(int)response.StatusCode}: {body}");
         }
 
         using var document = JsonDocument.Parse(body);

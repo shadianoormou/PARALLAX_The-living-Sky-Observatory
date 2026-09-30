@@ -43,6 +43,16 @@ python3 -m uvicorn app.main:app --app-dir services/science --reload --port 8001
 curl http://localhost:8001/health
 ```
 
+The science image adapter also requires `astropy` from `services/science/requirements.txt`. To query real public SPHEREx products through IRSA:
+
+```bash
+curl -X POST http://localhost:8001/archive/spherex/analyze \
+  -H 'content-type: application/json' \
+  -d '{"ra_deg":127.69444,"dec_deg":-39.1776,"radius_deg":0.001,"collection":"spherex_qr2","band":"SPHEREx-D3","cutout_size_deg":0.03,"max_results":20}'
+```
+
+The same operation is available through the API at `/api/archive/spherex/analyze`; the browser workflow is `/spherex`. Real archive failures remain explicit and do not silently fall back to synthetic science.
+
 The processing service accepts the deterministic demo request:
 
 ```bash

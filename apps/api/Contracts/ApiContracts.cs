@@ -19,6 +19,15 @@ public sealed record ScienceProcessRequest(
     [property: JsonPropertyName("seed")] int Seed,
     [property: JsonPropertyName("background_sigma")] double BackgroundSigma);
 
+public sealed record SpherexArchiveRequest(
+    [property: JsonPropertyName("ra_deg")] double RaDeg,
+    [property: JsonPropertyName("dec_deg")] double DecDeg,
+    [property: JsonPropertyName("radius_deg")] double RadiusDeg = 0.01,
+    [property: JsonPropertyName("collection")] string Collection = "spherex_qr2",
+    [property: JsonPropertyName("band")] string? Band = null,
+    [property: JsonPropertyName("cutout_size_deg")] double CutoutSizeDeg = 0.1,
+    [property: JsonPropertyName("max_results")] int MaxResults = 50);
+
 public sealed class ScienceAnalysisResponse
 {
     [JsonPropertyName("dataset_label")] public string DatasetLabel { get; set; } = string.Empty;

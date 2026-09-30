@@ -66,6 +66,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 public sealed class FakeScienceServiceClient : IScienceServiceClient
 {
     public Task<JsonElement> RunValidationAsync(CancellationToken cancellationToken) => Task.FromResult(JsonSerializer.SerializeToElement(new { summary = new { passed = 5, failed = 0, total = 5 } }));
+    public Task<JsonElement> SearchSpherexAsync(SpherexArchiveRequest request, CancellationToken cancellationToken) => Task.FromResult(JsonSerializer.SerializeToElement(new { source = "NASA SPHEREx / IRSA", records = Array.Empty<object>() }));
+    public Task<JsonElement> AnalyzeSpherexAsync(SpherexArchiveRequest request, CancellationToken cancellationToken) => Task.FromResult(JsonSerializer.SerializeToElement(new { source = "NASA SPHEREx / IRSA", analysis = new { comparison = new { status = "READY TO COMPARE" } } }));
 
     public Task<ScienceAnalysisResponse> AnalyzeAsync(ScienceProcessRequest request, CancellationToken cancellationToken)
     {
@@ -190,6 +192,22 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
         var report = await client.GetFromJsonAsync<JsonElement>("/api/validation");
         Assert.Equal(5, report.GetProperty("summary").GetProperty("passed").GetInt32());
         Assert.Equal(0, report.GetProperty("summary").GetProperty("failed").GetInt32());
+    }
+
+    [Fact]
+    public async Task Spherex_archive_endpoints_proxy_science_service()
+    {
+        using var client = factory.CreateClient();
+        var request = new SpherexArchiveRequest(127.69, -39.17, Band: "SPHEREx-D3");
+        var search = await client.PostAsJsonAsync("/api/archive/spherex/search", request);
+        Assert.Equal(HttpStatusCode.OK, search.StatusCode);
+        var searchPayload = await search.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("NASA SPHEREx / IRSA", searchPayload.GetProperty("source").GetString());
+
+        var analysis = await client.PostAsJsonAsync("/api/archive/spherex/analyze", request);
+        Assert.Equal(HttpStatusCode.OK, analysis.StatusCode);
+        var analysisPayload = await analysis.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("READY TO COMPARE", analysisPayload.GetProperty("analysis").GetProperty("comparison").GetProperty("status").GetString());
     }
 
     [Fact]

@@ -97,6 +97,20 @@ def assess_comparison_metadata(
     else:
         warnings.append("Registration quality will be measured before candidate promotion.")
 
+    for label, metadata in (("A", metadata_a), ("B", metadata_b)):
+        bad_fraction = metadata.get("bad_pixel_fraction")
+        if isinstance(bad_fraction, (int, float)):
+            if bad_fraction > 0.5:
+                blocking.append(f"Observation {label} has more than 50% flagged pixels in the requested field.")
+            elif bad_fraction > 0.1:
+                warnings.append(f"Observation {label} has elevated flagged-pixel coverage in the requested field.")
+        invalid_fraction = metadata.get("invalid_pixel_fraction")
+        if isinstance(invalid_fraction, (int, float)):
+            if invalid_fraction > 0.2:
+                blocking.append(f"Observation {label} has too much missing or non-finite image data.")
+            elif invalid_fraction > 0.05:
+                warnings.append(f"Observation {label} contains missing or non-finite image data.")
+
     if blocking:
         status = "COMPARISON NOT RELIABLE"
         reasons = blocking
@@ -305,7 +319,10 @@ def detect_candidates(
                     "position_a_xy": [float(nx), float(ny)],
                     "position_b_xy": [float(px), float(py)],
                     "displacement_pixels_xy": displacement,
-                    "displacement_arcsec_xy": [value * 0.4 for value in displacement],
+                    "displacement_arcsec_xy": [
+                        value * float(epoch_a.metadata.get("pixel_scale_arcsec", 0.4))
+                        for value in displacement
+                    ],
                 },
                 "quality": {
                     "negative_lobe_snr": negative["snr"],

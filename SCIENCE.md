@@ -1,6 +1,6 @@
 # Science notes
 
-Phase 6 uses a deterministic synthetic measurement pipeline. The synthetic images are a validation instrument, not a NASA archive observation and not evidence of a discovery.
+PARALLAX has two explicit data modes. The deterministic synthetic pipeline is a validation instrument, not a NASA archive observation; the SPHEREx mode loads real IRSA FITS cutouts and remains conservative about quality and interpretation.
 
 ## Pipeline
 
@@ -43,8 +43,12 @@ The assessment is persisted beside each API processing run as `ComparisonAssessm
 - Spectral samples are illustrative arrays with no physical units or archive provenance.
 - PGM debug files are visual diagnostics, not calibrated science products.
 
-## Future real-data adapter
+## SPHEREx / IRSA real-data adapter
 
-`services/science/app/adapters.py` defines an `ObservationPairAdapter` protocol and a deliberately unimplemented `FutureArchiveAdapter`. Replacing the synthetic adapter requires a verified archive client, source identifiers, retrieval timestamps, coordinate/WCS metadata, units, quality flags, and provenance records. No real endpoint or URL is fabricated in this repository.
+`services/science/app/adapters.py` implements `SpherexIrsaAdapter` against IRSA's SIA service. It discovers same-band epochs, requests bounded FITS cutouts, reads IMAGE/FLAGS/VARIANCE extensions, computes a SHA-256 checksum, and attaches the SIA query, source URL, retrieval timestamp, WCS, units, wavelengths, and quality metadata. The science endpoints are `/archive/spherex/search` and `/archive/spherex/analyze`; the API proxies them at `/api/archive/spherex/search` and `/api/archive/spherex/analyze`.
+
+SPHEREx flags are bitmasks. The nominal source-mask bit (`2^21`) is preserved but is not counted as a bad pixel; non-nominal flags are surfaced to Comparison Guard. Display previews are contrast-stretched UI aids and are never used as measurement input.
+
+The archive adapter does not claim a Planet X detection. It reports only measured residuals and conservative candidate language.
 
 All demo material must be marked `DEMONSTRATION DATASET`, linked to provenance, and described as candidate evidence rather than a discovery.

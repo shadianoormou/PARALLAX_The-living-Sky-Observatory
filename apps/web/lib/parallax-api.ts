@@ -139,6 +139,60 @@ export type ValidationReport = {
   limitations: string[];
 };
 
+export type SpherexArchiveRequest = {
+  ra_deg: number;
+  dec_deg: number;
+  radius_deg: number;
+  collection: string;
+  band?: string;
+  cutout_size_deg: number;
+  max_results: number;
+};
+
+export type SpherexArchiveRecord = {
+  observation_id: string;
+  band: string;
+  access_url: string;
+  ra_deg: number;
+  dec_deg: number;
+  pixel_scale_arcsec: number;
+  t_min_mjd: number;
+  t_max_mjd: number;
+  wavelength_um: [number | null, number | null];
+  release_date: string | null;
+};
+
+export type SpherexArchiveSearch = {
+  source: string;
+  query: SpherexArchiveRequest;
+  records: SpherexArchiveRecord[];
+};
+
+export type SpherexPreview = {
+  width: number;
+  height: number;
+  pixels: number[];
+  display_min: number;
+  display_max: number;
+  stride: number;
+};
+
+export type SpherexArchiveAnalysis = {
+  source: string;
+  manifest: JsonObject;
+  previews: { a: SpherexPreview; b: SpherexPreview };
+  analysis: {
+    dataset_label: string;
+    epochs: { a: JsonObject; b: JsonObject };
+    comparison: ComparisonAssessment;
+    registration: JsonObject;
+    difference: JsonObject;
+    candidates: Array<{ candidate_id: string; classification: string; measurement: JsonObject; quality: JsonObject; interpretation: string }>;
+    screened_candidates: Array<{ candidate_id: string; classification: string; status: string; interpretation: string }>;
+    processing_blocked?: boolean;
+  };
+};
+
 export class ParallaxApiError extends Error {
   status: number;
 
@@ -201,6 +255,12 @@ export const parallaxApi = {
   getPassport: () => fetchJson<Passport>('/api/passport'),
   completeLearningModule: (moduleKey: string) => fetchJson<Passport>(`/api/passport/modules/${moduleKey}`, { method: 'POST' }),
   getValidation: () => fetchJson<ValidationReport>('/api/validation'),
+  searchSpherex: (request: SpherexArchiveRequest) => fetchJson<SpherexArchiveSearch>('/api/archive/spherex/search', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request),
+  }),
+  analyzeSpherex: (request: SpherexArchiveRequest) => fetchJson<SpherexArchiveAnalysis>('/api/archive/spherex/analyze', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request),
+  }),
 };
 
 export function getNumber(measurements: Measurement[], metricName: string) {
