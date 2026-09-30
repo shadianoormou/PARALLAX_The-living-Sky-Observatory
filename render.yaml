@@ -14,10 +14,7 @@ services:
           name: parallax-db
           property: connectionString
       - key: ScienceService__BaseUrl
-        fromService:
-          type: web
-          name: parallax-science
-          property: host
+        value: https://parallax-science.onrender.com
       - key: PARALLAX_APPLY_MIGRATIONS
         value: "true"
       - key: PARALLAX_REQUIRE_API_KEY
