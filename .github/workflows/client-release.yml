@@ -56,20 +56,17 @@ jobs:
       - name: Install desktop dependencies
         working-directory: desktop
         run: pnpm install --frozen-lockfile --ignore-workspace
-      - name: Build Windows ZIP and installer
+      - name: Build Windows ZIP
         working-directory: desktop
-        run: node_modules/.bin/electron-builder --win nsis zip
+        run: node_modules/.bin/electron-builder --win zip --publish never
       - name: Prepare Windows artifacts
         shell: pwsh
         run: |
           Copy-Item desktop/dist/PARALLAX-Observatory-0.1.0-win-x64.zip PARALLAX-Observatory-live-backend-win-x64.zip
-          Copy-Item desktop/dist/PARALLAX-Observatory-0.1.0-win-x64.exe PARALLAX-Observatory-live-backend-win-x64.exe
       - uses: actions/upload-artifact@v4
         with:
           name: windows-client
-          path: |
-            PARALLAX-Observatory-live-backend-win-x64.zip
-            PARALLAX-Observatory-live-backend-win-x64.exe
+          path: PARALLAX-Observatory-live-backend-win-x64.zip
 
   release:
     needs: [android, windows]
