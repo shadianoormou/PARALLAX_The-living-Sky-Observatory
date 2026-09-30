@@ -5,6 +5,8 @@
   "packageManager": "pnpm@9.15.5",
   "scripts": {
     "dev:web": "pnpm --filter @parallax/web dev",
+    "build": "pnpm --filter @parallax/web build",
+    "start": "pnpm --filter @parallax/web start",
     "build:web": "pnpm --filter @parallax/web build",
     "lint:web": "pnpm --filter @parallax/web lint",
     "test": "pnpm --filter @parallax/web typecheck",
