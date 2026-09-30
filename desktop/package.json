@@ -1,0 +1,35 @@
+{
+  "name": "parallax-observatory-desktop",
+  "productName": "PARALLAX Observatory",
+  "version": "0.1.0",
+  "description": "The Living Sky Observatory — evidence-first space science review.",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist:mac": "electron-builder --mac dmg zip",
+    "dist:win": "electron-builder --win nsis zip",
+    "dist:linux": "electron-builder --linux AppImage deb"
+  },
+  "devDependencies": {
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "org.parallax.observatory.desktop",
+    "productName": "PARALLAX Observatory",
+    "artifactName": "PARALLAX-Observatory-${version}-${os}-${arch}.${ext}",
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.education",
+      "target": ["dmg", "zip"]
+    },
+    "win": {
+      "target": ["nsis", "zip"]
+    },
+    "linux": {
+      "category": "Education",
+      "target": ["AppImage", "deb"]
+    }
+  }
+}
