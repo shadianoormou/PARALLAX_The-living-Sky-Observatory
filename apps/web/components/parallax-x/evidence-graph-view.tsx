@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { AlertTriangle, Check, Eye, GitCompareArrows, Network, RefreshCw, Send, ShieldCheck, ShieldX, Telescope } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { CommunityMetrics, ParallaxApiError, ResearchFeedbackMetrics, SpherexEvidenceGraph, parallaxApi } from '../../lib/parallax-api';
+import { CommunityMetrics, ParallaxApiError, ResearchFeedbackMetrics, SpherexEvidenceBand, SpherexEvidenceGraph, parallaxApi } from '../../lib/parallax-api';
 
 const BAND_OPTIONS = ['SPHEREx-D3', 'SPHEREx-D4', 'SPHEREx-D5', 'SPHEREx-D6'];
 
@@ -123,6 +123,7 @@ export function EvidenceGraphView() {
 
   return <div className="space-y-6">
     <MissionBrief />
+    <JudgeBrief onRun={() => void run()} loading={loading} />
     <section className="panel border-[var(--cyan)]/30 p-5 sm:p-7">
       <div className="flex flex-wrap items-start justify-between gap-5">
         <div className="max-w-2xl">
@@ -193,10 +194,28 @@ function MissionFact({ label, text }: { label: string; text: string }) {
   return <div className="border-l border-[var(--line-strong)] pl-3"><p className="mono text-[9px] uppercase tracking-[.1em] text-[var(--cyan)]">{label}</p><p className="mt-2 text-xs leading-5 text-[var(--muted)]">{text}</p></div>;
 }
 
+function JudgeBrief({ onRun, loading }: { onRun: () => void; loading: boolean }) {
+  return <section className="panel border-[var(--cyan)]/35 p-5 sm:p-7" aria-labelledby="judge-brief-title">
+    <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="eyebrow text-[var(--cyan)]">JUDGE BRIEF / 2 MINUTES</p><h2 id="judge-brief-title" className="mt-3 text-2xl font-medium tracking-[-.03em] text-[var(--ink)]">One real archive case, four decisions.</h2><p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">Use the prefilled SPHEREx / IRSA target to tell one complete story: start with the repeated observations, show the quality gate, inspect the residual, then stop at the correct human-review conclusion.</p></div><span className="mono border border-[var(--cyan)]/35 px-3 py-2 text-[9px] uppercase tracking-[.12em] text-[var(--cyan)]">REAL DATA / NO DISCOVERY CLAIM</span></div>
+    <ol className="mt-6 grid gap-2 md:grid-cols-4">
+      <BriefStep number="01" title="Before" text="One sky position, repeated SPHEREx epochs, provenance attached." />
+      <BriefStep number="02" title="Quality gate" text="Flags, variance, overlap, and registration are checked before promotion." />
+      <BriefStep number="03" title="Residual" text="A measured change, screened artifact, or honest null result stays visible." />
+      <BriefStep number="04" title="Conclusion" text="Cross-band context determines the next human-review action—not certainty." />
+    </ol>
+    <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-[var(--line)] pt-5"><button type="button" onClick={onRun} disabled={loading} className="focus-ring inline-flex items-center gap-2 bg-[var(--signal)] px-5 py-3 mono text-[10px] uppercase tracking-[.12em] text-[var(--void)] disabled:opacity-50"><RefreshCw size={13} className={loading ? 'animate-spin' : ''} />{loading ? 'Running real-data case…' : 'Start 2-minute judge brief'}</button><p className="text-xs text-[var(--quiet)]">The evidence is exploratory; a human reviewer decides what happens next.</p></div>
+  </section>;
+}
+
+function BriefStep({ number, title, text }: { number: string; title: string; text: string }) {
+  return <li className="border border-[var(--line)] bg-[var(--surface-2)] p-4"><span className="mono text-[9px] text-[var(--cyan)]">{number}</span><h3 className="mt-3 text-sm font-medium text-[var(--ink)]">{title}</h3><p className="mt-2 text-xs leading-5 text-[var(--muted)]">{text}</p></li>;
+}
+
 function Report({ report, metrics, feedbackMetrics, feedbackMessage, onFeedback, onDownload, onDownloadCsv, onCopyLink, shareMessage }: { report: SpherexEvidenceGraph; metrics: CommunityMetrics | null; feedbackMetrics: ResearchFeedbackMetrics | null; feedbackMessage: string | null; onFeedback: (signal: 'useful' | 'unclear' | 'would-share') => void; onDownload: () => void; onDownloadCsv: () => void; onCopyLink: () => void; shareMessage: string | null }) {
   const summary = report.summary;
   return <div className="space-y-6">
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6"><Metric label="Bands" value={String(summary.bands_requested)} tone="cyan" /><Metric label="Ready" value={String(summary.bands_ready)} tone="signal" /><Metric label="Caution / blocked" value={`${summary.bands_caution} / ${summary.bands_blocked}`} tone={summary.bands_blocked ? 'amber' : 'cyan'} /><Metric label="Errors" value={String(summary.bands_error)} tone={summary.bands_error ? 'amber' : 'signal'} /><Metric label="Candidates" value={String(summary.total_candidates)} tone="signal" /><Metric label="Consistency" value={summary.consistency_status.replaceAll('_', ' ')} tone={summary.matched_candidate_groups ? 'signal' : 'cyan'} /></div>
+    <JudgeConclusion report={report} />
     <section className="panel p-5 sm:p-7">
       <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="eyebrow">TARGET EVIDENCE CHAIN</p><h2 className="mt-3 text-xl font-medium text-[var(--ink)]">{report.target.ra_deg.toFixed(5)}°, {report.target.dec_deg.toFixed(5)}°</h2><p className="mt-2 text-xs text-[var(--quiet)]">{report.summary.processing_mode} · {report.summary.elapsed_seconds.toFixed(1)}s total · {report.summary.cache_hits} cache hit(s)</p></div><div className="flex flex-wrap items-center gap-2"><span className="mono border border-[var(--line)] px-3 py-2 text-[9px] uppercase tracking-[.1em] text-[var(--quiet)]">{report.graph.nodes.length} nodes / {report.graph.edges.length} links</span><button type="button" onClick={onCopyLink} className="focus-ring border border-[var(--line-strong)] px-3 py-2 mono text-[9px] uppercase tracking-[.1em] text-[var(--cyan)]">Copy review link</button><button type="button" onClick={onDownload} className="focus-ring bg-[var(--cyan)] px-3 py-2 mono text-[9px] uppercase tracking-[.1em] text-[var(--void)]">Export JSON</button><button type="button" onClick={onDownloadCsv} className="focus-ring border border-[var(--line-strong)] px-3 py-2 mono text-[9px] uppercase tracking-[.1em] text-[var(--cyan)]">Export CSV</button></div></div>
       <div className="mt-6 space-y-3">{report.bands.map((item) => <BandCard key={item.band} item={item} />)}</div>
@@ -209,12 +228,32 @@ function Report({ report, metrics, feedbackMetrics, feedbackMessage, onFeedback,
   </div>;
 }
 
+function JudgeConclusion({ report }: { report: SpherexEvidenceGraph }) {
+  const conclusion = judgeConclusion(report);
+  return <section className={`border p-5 sm:p-7 ${conclusion.tone === 'signal' ? 'border-[var(--signal)]/45 bg-[var(--signal-soft)]' : conclusion.tone === 'amber' ? 'border-[var(--amber)]/45 bg-[rgba(243,187,113,.07)]' : 'border-[var(--cyan)]/35 bg-[rgba(141,229,226,.06)]'}`} aria-live="polite"><p className="eyebrow">CASE STUDY CONCLUSION</p><div className="mt-3 flex flex-wrap items-center justify-between gap-4"><h2 className="text-2xl font-medium tracking-[-.03em] text-[var(--ink)] sm:text-3xl">{conclusion.label}</h2><span className="mono border border-current px-3 py-2 text-[9px] uppercase tracking-[.12em]" style={{ color: `var(--${conclusion.tone})` }}>{conclusion.tone === 'signal' ? 'REVIEWABLE' : conclusion.tone === 'amber' ? 'CAUTION' : 'CONTEXT ONLY'}</span></div><p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--muted)]">{conclusion.text}</p><p className="mt-5 border-t border-current/20 pt-4 text-sm font-medium leading-7 text-[var(--ink)]"><span className="mono mr-2 text-[9px] uppercase tracking-[.1em] text-[var(--cyan)]">What should the reviewer do next?</span>{conclusion.next}</p></section>;
+}
+
+function judgeConclusion(report: SpherexEvidenceGraph): { label: string; text: string; next: string; tone: 'signal' | 'amber' | 'cyan' } {
+  if (report.summary.bands_blocked > 0 || report.summary.bands_error > 0) return { label: 'COMPARISON BLOCKED', text: 'At least one requested band could not support a reliable comparison, so the evidence chain is not ready for interpretation.', next: 'Inspect the blocking quality or archive error, then retry with a compatible epoch pair or remove the failed band.', tone: 'amber' };
+  if (report.summary.total_candidates === 0) return { label: 'NO PROMOTED RESIDUAL', text: 'No residual passed the promotion gate in this case. That is a valid null result, not evidence that the sky is empty.', next: 'Keep the null result in the record and stop short of a discovery claim; only reopen it with a new observation or analysis question.', tone: 'cyan' };
+  if (report.cross_band_consistency.status.startsWith('MULTI-BAND')) return { label: 'MULTI-BAND CONSISTENT', text: `The evidence graph found ${report.summary.matched_candidate_groups} cross-band group(s) while preserving each band’s independent quality checks.`, next: 'Open the matched candidate group, inspect its provenance and screened alternatives, then send the evidence bundle to human review.', tone: 'signal' };
+  return { label: 'SINGLE-BAND ONLY', text: 'A promoted residual is present, but the selected bands did not produce a cross-band match. This remains provisional evidence.', next: 'Treat the candidate as a lead only; inspect the residual and request independent verification before interpreting it.', tone: 'amber' };
+}
+
 function BandCard({ item }: { item: SpherexEvidenceGraph['bands'][number] }) {
   const blocked = item.status === 'COMPARISON NOT RELIABLE' || item.status === 'ERROR';
   const ready = item.status === 'READY TO COMPARE';
   const quality = item.quality;
   const valid = Array.isArray(quality.valid_pixel_fraction) ? quality.valid_pixel_fraction.map((value) => typeof value === 'number' ? `${(value * 100).toFixed(1)}%` : '—').join(' / ') : '—';
-  return <article className="border border-[var(--line)] bg-[var(--surface-2)] p-4 sm:p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="mono text-[10px] uppercase tracking-[.12em] text-[var(--cyan)]">{item.band}</p><h3 className="mt-2 text-lg text-[var(--ink)]">{item.candidate_count ? `${item.candidate_count} promoted candidate(s)` : 'Null result / no promoted residual'}</h3></div><span className={`inline-flex items-center gap-1.5 border px-2.5 py-1 mono text-[9px] uppercase tracking-[.08em] ${ready ? 'border-[var(--signal)]/40 text-[var(--signal)]' : blocked ? 'border-[var(--amber)]/40 text-[var(--amber)]' : 'border-[var(--cyan)]/40 text-[var(--cyan)]'}`}>{ready ? <Check size={12} /> : blocked ? <AlertTriangle size={12} /> : <ShieldCheck size={12} />}{item.status}</span></div><div className="mt-4 grid gap-3 text-xs sm:grid-cols-3"><Data label="Epoch chain" value={item.epochs.length ? item.epochs.join(' → ') : item.error ?? 'No usable pair'} /><Data label="Valid pixels" value={valid} /><Data label="Screened" value={String(item.screened_count)} /></div>{item.candidate_count === 0 && <p className="mt-4 text-xs leading-6 text-[var(--quiet)]">Measured, reviewed, and retained as a null result for this band—not evidence that the sky is empty.</p>}{item.error && <p className="mt-4 text-xs leading-6 text-[var(--amber)]">{item.error}</p>}</article>;
+  return <article className="border border-[var(--line)] bg-[var(--surface-2)] p-4 sm:p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="mono text-[10px] uppercase tracking-[.12em] text-[var(--cyan)]">{item.band}</p><h3 className="mt-2 text-lg text-[var(--ink)]">{item.candidate_count ? `${item.candidate_count} promoted candidate(s)` : 'Null result / no promoted residual'}</h3></div><span className={`inline-flex items-center gap-1.5 border px-2.5 py-1 mono text-[9px] uppercase tracking-[.08em] ${ready ? 'border-[var(--signal)]/40 text-[var(--signal)]' : blocked ? 'border-[var(--amber)]/40 text-[var(--amber)]' : 'border-[var(--cyan)]/40 text-[var(--cyan)]'}`}>{ready ? <Check size={12} /> : blocked ? <AlertTriangle size={12} /> : <ShieldCheck size={12} />}{item.status}</span></div><div className="mt-4 grid gap-3 text-xs sm:grid-cols-3"><Data label="Epoch chain" value={item.epochs.length ? item.epochs.join(' → ') : item.error ?? 'No usable pair'} /><Data label="Valid pixels" value={valid} /><Data label="Screened" value={String(item.screened_count)} /></div>{item.candidate_count === 0 && <p className="mt-4 text-xs leading-6 text-[var(--quiet)]">Measured, reviewed, and retained as a null result for this band—not evidence that the sky is empty.</p>}{item.error && <p className="mt-4 text-xs leading-6 text-[var(--amber)]">{item.error}</p>}<p className="mt-5 border-t border-[var(--line)] pt-4 text-xs leading-6 text-[var(--ink)]"><span className="mono mr-2 text-[9px] uppercase tracking-[.1em] text-[var(--cyan)]">What should the reviewer do next?</span>{bandNextAction(item)}</p></article>;
+}
+
+function bandNextAction(item: SpherexEvidenceBand): string {
+  if (item.status === 'COMPARISON NOT RELIABLE') return 'Do not interpret this band; inspect the blocking quality issue or select a compatible epoch pair.';
+  if (item.status === 'ERROR') return 'Retry the archive request or verify product availability before using this band as evidence.';
+  if (item.candidate_count === 0) return 'Keep this null result as a constraint and do not promote a candidate from this band.';
+  if (item.status === 'COMPARE WITH CAUTION') return 'Inspect the caution flags and seek independent verification before relying on this residual.';
+  return 'Inspect the promoted residual and compare its provenance and alternatives with the other selected bands.';
 }
 
 function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label><span className="mono mb-2 block text-[9px] uppercase tracking-[.1em] text-[var(--quiet)]">{label}</span><input value={value} onChange={(event) => onChange(event.target.value)} className="focus-ring w-full border border-[var(--line-strong)] bg-[var(--surface-2)] px-3 py-3 text-sm text-[var(--ink)]" inputMode="decimal" /></label>; }
