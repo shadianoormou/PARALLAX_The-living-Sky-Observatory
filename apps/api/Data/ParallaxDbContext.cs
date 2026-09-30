@@ -36,11 +36,13 @@ public sealed class ParallaxDbContext(DbContextOptions<ParallaxDbContext> option
         modelBuilder.Entity<Achievement>().HasIndex(x => x.Key).IsUnique();
         modelBuilder.Entity<UserAchievement>().HasIndex(x => new { x.UserProfileId, x.AchievementId }).IsUnique();
 
-        modelBuilder.Entity<DatasetSource>().Property(x => x.CreatedAtUtc).HasDefaultValueSql("SYSUTCDATETIME()");
-        modelBuilder.Entity<Observation>().Property(x => x.CreatedAtUtc).HasDefaultValueSql("SYSUTCDATETIME()");
-        modelBuilder.Entity<Candidate>().Property(x => x.CreatedAtUtc).HasDefaultValueSql("SYSUTCDATETIME()");
-        modelBuilder.Entity<UserProfile>().Property(x => x.CreatedAtUtc).HasDefaultValueSql("SYSUTCDATETIME()");
-        modelBuilder.Entity<AuditEntry>().Property(x => x.CreatedAtUtc).HasDefaultValueSql("SYSUTCDATETIME()");
+        // CURRENT_TIMESTAMP is supported by SQL Server, PostgreSQL, and SQLite.
+        // Application writes still set UTC explicitly; this keeps bootstrap schemas portable.
+        modelBuilder.Entity<DatasetSource>().Property(x => x.CreatedAtUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        modelBuilder.Entity<Observation>().Property(x => x.CreatedAtUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        modelBuilder.Entity<Candidate>().Property(x => x.CreatedAtUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        modelBuilder.Entity<UserProfile>().Property(x => x.CreatedAtUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        modelBuilder.Entity<AuditEntry>().Property(x => x.CreatedAtUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
         modelBuilder.Entity<DatasetSource>().HasMany(x => x.Observations).WithOne(x => x.DatasetSource).HasForeignKey(x => x.DatasetSourceId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<DatasetSource>().HasMany(x => x.ProcessingRuns).WithOne(x => x.DatasetSource).HasForeignKey(x => x.DatasetSourceId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<SkyRegion>().HasMany(x => x.Observations).WithOne(x => x.SkyRegion).HasForeignKey(x => x.SkyRegionId).OnDelete(DeleteBehavior.SetNull);

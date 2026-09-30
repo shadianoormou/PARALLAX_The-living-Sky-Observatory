@@ -27,20 +27,35 @@ dotnet tool run dotnet-ef migrations list --project apps/api/Parallax.Api.csproj
 dotnet tool run dotnet-ef database update --project apps/api/Parallax.Api.csproj --startup-project apps/api/Parallax.Api.csproj
 ```
 
-The migrations are in `apps/api/Migrations/`, including `AddClassificationConfidence`. The local API uses SQL Server from `ConnectionStrings:DefaultConnection`; tests replace it with an in-memory SQLite connection.
+The migrations are in `apps/api/Migrations/`, including `AddClassificationConfidence`. PostgreSQL is the Compose production-shaped provider; tests replace the database with an in-memory SQLite connection.
 
-For a persistent local run without Docker/SQL Server, use the SQLite development profile:
+For a persistent local run without Docker/PostgreSQL, use the SQLite development profile:
 
 ```bash
 PARALLAX_DATABASE_PROVIDER=sqlite PARALLAX_APPLY_MIGRATIONS=true \
   dotnet run --project apps/api/Parallax.Api.csproj
 ```
 
-This creates `data/parallax-dev.db` and enables the same candidate, classification, consensus, passport, and community-metrics endpoints locally. Docker Compose continues to use SQL Server for the production-shaped stack.
+This creates `data/parallax-dev.db` and enables the same candidate, classification, consensus, passport, and community-metrics endpoints locally. Docker Compose uses PostgreSQL for the production-shaped stack.
 
-For a controlled startup migration, set `PARALLAX_APPLY_MIGRATIONS=true`. The API then runs `Database.MigrateAsync()` before listening. It is disabled by default in local development so migration ownership stays explicit; Compose enables it after the SQL Server health check passes.
+For a controlled startup schema step, set `PARALLAX_APPLY_MIGRATIONS=true`. SQL Server uses `Database.MigrateAsync()`; SQLite and PostgreSQL use EF model bootstrap (`EnsureCreatedAsync`) so the provider-neutral model can initialize a fresh database. It is disabled by default in local development; Compose enables it after the PostgreSQL health check passes. For long-lived hosted PostgreSQL, run schema changes through a reviewed migration job before deploying the API.
 
-The safe recovery sequence is: stop the API, verify the database volume is present, run `dotnet tool run dotnet-ef database update ...`, restart the API, and inspect `/health/ready`. Never delete the volume as a first recovery step.
+The safe recovery sequence is: stop the API, verify the database volume is present, restore a verified dump if needed, restart the API, and inspect `/health/ready`. Never delete the volume as a first recovery step.
+
+## Production operations
+
+The API exposes `/health/live` for process liveness, `/health/ready` for database readiness, `/metrics` in Prometheus text format, and `/api/ops/metrics` for authenticated JSON counters. Set `PARALLAX_REQUIRE_API_KEY=true` and inject `PARALLAX_API_KEY` to require `X-API-Key` or `Authorization: Bearer` on mutating `/api` calls. The default global limiter allows 120 requests per client IP per minute and returns HTTP 429 when the window is exhausted.
+
+Create and verify PostgreSQL backups with:
+
+```bash
+./scripts/backup_postgres.sh
+BACKUP_FILE=./backups/parallax-<timestamp>.dump CONFIRM_RESTORE=YES ./scripts/restore_postgres.sh
+```
+
+The restore script is intentionally destructive for the target database and requires the explicit `CONFIRM_RESTORE=YES` guard.
+
+CI runs web lint/typecheck/build, API build/tests, science tests, and Chromium browser E2E. Locally, install the browser once with `pnpm --filter @parallax/web exec playwright install chromium`, then run `pnpm test:e2e`.
 
 ## Science service
 
@@ -104,10 +119,12 @@ Classification submission uses `POST /api/classifications` with `{ "candidate_id
 
 `GET /api/community/metrics` returns privacy-preserving aggregate adoption evidence: persisted review count, unique reviewer count, candidates reviewed, candidates with consensus, winning agreement, and label counts. The Citizen Science page displays these totals and clearly reports when the database is unavailable.
 
-## SQL Server
+## PostgreSQL / Docker Compose
 
 ```bash
-docker compose up -d sqlserver
+cp .env.example .env
+# edit .env and set POSTGRES_PASSWORD
+docker compose up -d postgres
 docker compose ps
 ```
 

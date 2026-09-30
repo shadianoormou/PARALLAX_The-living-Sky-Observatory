@@ -6,7 +6,7 @@ PARALLAX is a deliberately separated monorepo. The web experience owns presentat
 Observation data → FastAPI science engine → candidate extraction
                                       │
                                       ▼
-                         ASP.NET API (5080) → SQL Server (1433)
+                         ASP.NET API (5080) → PostgreSQL (5432)
                                       │
                                       ▼
                          Next.js web → human classification
@@ -30,11 +30,11 @@ Classification consensus is recalculated only from stored `Classification` rows.
 The implemented product flow is:
 
 ```text
-Observation Data → Science Engine → Candidate Extraction → ASP.NET API → SQL Server → Web Experience → Human Classification
+Observation Data → Science Engine / bounded worker queue → Candidate Extraction → ASP.NET API → PostgreSQL → Web Experience → Human Classification
 ```
 
 The candidate record links back to its `ProcessingRun`, and that run links to `DatasetSource`, so a public vote never loses its source context.
 
 ## Deployment intent
 
-The services are independently deployable. Production secrets and database credentials must be injected by the deployment environment. The repository contains development configuration only.
+The services are independently deployable. PostgreSQL is the Compose production-shaped provider; SQLite is explicitly a development profile. Production secrets and database credentials must be injected by the deployment environment. The API exposes `/health/live`, database-backed `/health/ready`, `/metrics`, and `/api/ops/metrics`; `PARALLAX_REQUIRE_API_KEY=true` enables API-key/Bearer protection for mutating API calls. The repository includes CI, Playwright Chromium smoke tests, and checksummed PostgreSQL backup/restore scripts. Hosted TLS, WAF, secret-manager, and alert integrations remain deployment-specific configuration.

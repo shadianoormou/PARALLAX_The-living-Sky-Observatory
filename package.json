@@ -12,6 +12,7 @@
     "test:science": ".venv/bin/pytest -q tests/science",
     "test:explanations": "node --experimental-strip-types --test tests/web/explanations.test.ts",
     "test:release": "node --experimental-strip-types --test tests/web/release-contract.test.ts",
+    "test:e2e": "pnpm --filter @parallax/web test:e2e",
     "migrate:api": "dotnet tool run dotnet-ef database update --project apps/api/Parallax.Api.csproj --startup-project apps/api/Parallax.Api.csproj",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

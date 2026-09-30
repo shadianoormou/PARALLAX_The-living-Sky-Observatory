@@ -53,16 +53,17 @@ python3 -m uvicorn app.main:app --app-dir services/science --reload --port 8001
 
 The observatory is at http://localhost:3000/explore, the API health endpoint is http://localhost:5080/health, and the science health endpoint is http://localhost:8001/health.
 
-If Docker/SQL Server is unavailable, start the API with the persistent SQLite development profile:
+If Docker/PostgreSQL is unavailable, start the API with the persistent SQLite development profile:
 
 ```bash
 PARALLAX_DATABASE_PROVIDER=sqlite PARALLAX_APPLY_MIGRATIONS=true dotnet run --project apps/api/Parallax.Api.csproj
 ```
 
-To start SQL Server locally:
+To start the PostgreSQL production-shaped stack locally:
 
 ```bash
-docker compose up -d sqlserver
+cp .env.example .env
+docker compose up -d postgres
 ```
 
 Apply the EF Core migration after SQL Server is ready:
@@ -74,11 +75,11 @@ pnpm migrate:api
 
 ## One-command Docker startup
 
-Docker Compose starts SQL Server, applies pending EF migrations once the database is healthy, starts the science service and API, then serves the web app:
+Docker Compose starts PostgreSQL, bootstraps the EF model once the database is healthy, starts the science worker-backed service and API, then serves the web app:
 
 ```bash
 cp .env.example .env
-# edit .env and replace MSSQL_SA_PASSWORD with a strong local password
+# edit .env and replace POSTGRES_PASSWORD with a strong local password
 docker compose up --build
 ```
 
@@ -94,7 +95,7 @@ Time-domain astronomy is about change: repeated observations can reveal movement
 
 ## Architecture and features
 
-The web app calls an ASP.NET API. The API validates requests, calls the FastAPI science engine, runs and persists the Comparison Guard, persists datasets, observation epochs, processing runs, measurements, spectra, classifications, consensus, and audit events in SQL Server, and exposes a provenance trail. The web experience adds blink, split, difference and residual views, candidate selection, Public/Expert mode, spectral blink, guided demo narration, vote-gated consensus, responsive layouts, and reduced-motion handling.
+The web app calls an ASP.NET API. The API validates requests, calls the FastAPI science engine, runs and persists the Comparison Guard, persists datasets, observation epochs, processing runs, measurements, spectra, classifications, consensus, and audit events in PostgreSQL, and exposes a provenance trail. The API also exposes bounded background job polling, IP-partitioned rate limiting, optional API-key/Bearer authentication, readiness checks, Prometheus-style metrics, structured trace IDs, and operational JSON metrics. The web experience adds blink, split, difference and residual views, candidate selection, Public/Expert mode, spectral blink, guided demo narration, vote-gated consensus, responsive layouts, and reduced-motion handling.
 
 ## Science, provenance, and boundaries
 
@@ -117,7 +118,7 @@ Phase 8 hardens the evidence model for release: the science service blocks incom
 
 ## Limitations and future work
 
-This release uses a synthetic 128×128 validation field for regression tests and a bounded SPHEREx/IRSA cutout path for real archive inspection. Real FLAGS/VARIANCE quality masks are applied, but registration remains translation-only and does not yet solve full WCS distortion or instrument-specific PSF fitting. It still uses a single-flight API guard rather than a full production quota system, and manual screenshot/E2E rehearsal rather than a browser automation package. Real-data analysis remains an exploratory candidate workflow, not a survey completeness/purity claim. Future work should add richer WCS-aware registration, instrument-specific PSF fitting, authenticated accounts, production telemetry, managed secrets/backups, and a full browser test matrix.
+This release uses a synthetic 128×128 validation field for regression tests and a bounded SPHEREx/IRSA cutout path for real archive inspection. Real FLAGS/VARIANCE quality masks are applied, but registration remains translation-only and does not yet solve full WCS distortion or instrument-specific PSF fitting. PostgreSQL is the production-shaped Compose provider; SQLite remains a local development profile. API rate limiting, optional API-key authentication, health/readiness, Prometheus-style metrics, structured error traces, checksummed backup/restore scripts, CI, and Playwright Chromium smoke coverage are included. Hosted deployments still need platform-specific TLS, WAF/ingress, secret-manager, and external alert wiring. Real-data analysis remains an exploratory candidate workflow, not a survey completeness/purity claim. Future work should add richer WCS-aware registration, instrument-specific PSF fitting, and a full browser/device matrix.
 
 ## Credits
 

@@ -1,3 +1,5 @@
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Parallax.Api;
 using Parallax.Api.Data;
@@ -19,9 +21,13 @@ builder.Services.AddDbContext<ParallaxDbContext>(options =>
     {
         options.UseSqlite(builder.Configuration.GetConnectionString("Sqlite") ?? "Data Source=data/parallax-dev.db");
     }
+    else if (databaseProvider is "postgres" or "postgresql")
+    {
+        options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required for PostgreSQL."));
+    }
     else
     {
-        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required for SQL Server."));
     }
 });
 builder.Services.AddHttpClient<IScienceServiceClient, ScienceServiceClient>((serviceProvider, client) =>
@@ -34,33 +40,72 @@ builder.Services.AddHttpClient<IScienceServiceClient, ScienceServiceClient>((ser
 builder.Services.AddScoped<DemoAnalysisService>();
 builder.Services.AddScoped<ConsensusService>();
 builder.Services.AddScoped<PassportService>();
-builder.Services.AddHealthChecks();
+builder.Services.AddSingleton<ApiMetrics>();
+builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.MapToIPv4().ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true }));
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+var requireApiKey = builder.Configuration.GetValue<bool?>("PARALLAX_REQUIRE_API_KEY") ?? builder.Environment.IsProduction();
+if (requireApiKey && string.IsNullOrWhiteSpace(builder.Configuration["PARALLAX_API_KEY"]))
+    throw new InvalidOperationException("PARALLAX_API_KEY must be configured when PARALLAX_REQUIRE_API_KEY=true.");
+
 var app = builder.Build();
 app.UseExceptionHandler();
+app.UseRateLimiter();
 app.UseCors();
 app.UseSwagger();
 app.UseSwaggerUI();
+
+app.Use(async (context, next) =>
+{
+    var mutatingApiRequest = context.Request.Path.StartsWithSegments("/api") && context.Request.Method is "POST" or "PUT" or "PATCH" or "DELETE";
+    if (requireApiKey && mutatingApiRequest && !ApiKeyGuard.IsValid(context.Request, builder.Configuration))
+    {
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        await Results.Problem(title: "API authentication required", detail: "Supply a valid X-API-Key or Bearer token.", statusCode: StatusCodes.Status401Unauthorized).ExecuteAsync(context);
+        return;
+    }
+    await next();
+});
+
+app.Use(async (context, next) =>
+{
+    var metrics = context.RequestServices.GetRequiredService<ApiMetrics>();
+    var timer = metrics.BeginRequest();
+    try { await next(); }
+    finally { metrics.RecordRequest(context.Response.StatusCode, timer); }
+});
 
 if (builder.Configuration.GetValue<bool>("PARALLAX_APPLY_MIGRATIONS"))
 {
     await using var scope = app.Services.CreateAsyncScope();
     var db = scope.ServiceProvider.GetRequiredService<ParallaxDbContext>();
-    if (databaseProvider == "sqlite") await db.Database.EnsureCreatedAsync();
+    if (databaseProvider is "sqlite" or "postgres" or "postgresql") await db.Database.EnsureCreatedAsync();
     else await db.Database.MigrateAsync();
 }
 
 app.MapGet("/health", () => Results.Ok(new { service = "parallax-api", status = "ok", phase = "persistence-and-integration" }));
 app.MapGet("/api/v1/health", () => Results.Ok(new { service = "parallax-api", status = "ok", phase = "persistence-and-integration" }));
-app.MapGet("/health/ready", async (ParallaxDbContext db, CancellationToken cancellationToken) =>
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
-    var reachable = await db.Database.CanConnectAsync(cancellationToken);
-    return reachable
-        ? Results.Ok(new { service = "parallax-api", status = "ready" })
-        : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new { status = report.Status.ToString().ToLowerInvariant(), checks = report.Entries.ToDictionary(item => item.Key, item => item.Value.Status.ToString().ToLowerInvariant()) });
+    },
 });
+app.MapGet("/metrics", (ApiMetrics metrics) => Results.Text(metrics.ToPrometheus(), "text/plain; version=0.0.4"));
+app.MapGet("/api/ops/metrics", (ApiMetrics metrics) => Results.Ok(metrics.Snapshot()));
 app.MapParallaxEndpoints();
 
 app.Run();

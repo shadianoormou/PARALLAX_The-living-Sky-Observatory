@@ -9,10 +9,10 @@ This is the Phase 8 release gate. It records what was verified locally and what 
 - [x] Science tests cover deterministic generation, registration, known displacement, brightness variation, identical-epoch false positives, artifact screening, uncertain review items, higher-noise robustness, bad pairs, spectral measurement shape, and ground-truth exclusion.
 - [x] API tests cover candidate retrieval, persisted measurements, demo analysis, provenance epochs/source, classification confidence, vote-gated consensus, passport updates, and Swagger availability.
 - [x] The web contract test checks blink/split/difference, divider, spectral blink, classification, consensus, provenance, and the precomputed route.
-- [x] Precomputed `data/demo/` assets allow read-only exploration when API/science/SQL Server is unavailable.
+- [x] Precomputed `data/demo/` assets allow read-only exploration when API/science/PostgreSQL is unavailable.
 - [x] The real SPHEREx path carries FLAGS/VARIANCE quality masks into registration, differencing, and candidate extraction.
 - [x] Judge handoff, NASA data credits, and AI-assisted development disclosure are visible in the repository and web methodology route.
-- [x] A SQLite local persistence profile enables the full candidate → classification → consensus → passport flow when Docker SQL Server is unavailable; Compose remains SQL Server-backed.
+- [x] A SQLite local persistence profile enables the full candidate → classification → consensus → passport flow when Docker is unavailable; Compose uses a PostgreSQL-backed production-shaped stack.
 - [x] A repeatable three-field SPHEREx validation report records independent ready/caution/blocked/error outcomes without fabricating archive results.
 - [x] PARALLAX X exposes a multi-band SPHEREx evidence graph with per-band quality gates, epochs, candidates, null results, and explicit interpretation limits.
 - [x] The judge flow exposes cautious cross-band consistency associations and a measured impact path without inventing adoption numbers.
@@ -26,13 +26,16 @@ This is the Phase 8 release gate. It records what was verified locally and what 
 
 ## Operations and security
 
-- [x] `docker compose up --build` defines SQL Server, science, API, and web services with health checks and dependency ordering.
-- [x] Compose keeps the SQL password in `.env`; `.env.example` contains only a placeholder.
-- [x] API startup migration is opt-in through `PARALLAX_APPLY_MIGRATIONS=true` and is enabled by Compose after database readiness.
+- [x] `docker compose up --build` defines PostgreSQL, science, API, and web services with health checks and dependency ordering.
+- [x] Compose keeps the PostgreSQL password in `.env`; `.env.example` contains only placeholders.
+- [x] API startup schema bootstrap is opt-in through `PARALLAX_APPLY_MIGRATIONS=true` and is enabled by Compose after database readiness.
 - [x] Expensive demo analysis is guarded by a single-flight 429 gate.
 - [x] Request bounds and confidence validation are enforced; unexpected API errors return safe Problem Details without stack traces.
 - [x] CORS is configured from `PARALLAX_CORS_ORIGINS`.
-- [ ] A production deployment still needs an ingress/WAF rate limit, secret manager, TLS, backups, and observability configuration.
+- [x] API has IP-partitioned global rate limiting, optional API-key/Bearer authentication, structured trace logging, `/health/live`, database-backed `/health/ready`, Prometheus-style `/metrics`, and JSON operational metrics.
+- [x] PostgreSQL backup and restore scripts create checksummed custom-format dumps and require explicit restore confirmation.
+- [x] CI runs web lint/typecheck/build, API build/tests, science tests, and Playwright Chromium E2E tests.
+- [ ] A hosted deployment still needs its platform-specific TLS certificate, WAF/ingress policy, secret-manager binding, and external uptime/alert destination configured.
 
 ## Verification commands
 
@@ -41,6 +44,7 @@ pnpm test
 pnpm lint:web
 pnpm test:release
 pnpm test:explanations
+pnpm test:e2e
 .venv/bin/pytest -q tests/science
 dotnet build apps/api/Parallax.Api.csproj --no-restore
 dotnet test tests/api/Parallax.Api.Tests.csproj --no-restore
@@ -50,6 +54,6 @@ pnpm build:web
 ## Known limitations
 
 - The synthetic fixture remains a deterministic regression instrument; real SPHEREx analysis is bounded exploratory archive inspection, not a survey completeness/purity benchmark.
-- Full browser E2E automation is not installed; the web gate is a source contract test plus manual screenshot/rehearsal coverage.
-- Docker verification requires Docker Desktop and a host able to pull the .NET, Python, Node, and SQL Server images.
+- Playwright Chromium E2E now covers the judge route and classroom pilot dashboard; a larger cross-browser/device matrix remains future work.
+- Docker verification requires Docker Desktop and a host able to pull the .NET, Python, Node, and PostgreSQL images.
 - The local fallback cannot persist votes or consensus, by design.

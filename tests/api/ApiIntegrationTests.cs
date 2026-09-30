@@ -203,6 +203,20 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Operational_health_and_metrics_endpoints_are_available()
+    {
+        using var client = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health/live")).StatusCode);
+        var ready = await client.GetAsync("/health/ready");
+        Assert.Equal(HttpStatusCode.OK, ready.StatusCode);
+        Assert.Contains("database", await ready.Content.ReadAsStringAsync());
+        var metrics = await client.GetStringAsync("/metrics");
+        Assert.Contains("parallax_api_requests_total", metrics);
+        var snapshot = await client.GetFromJsonAsync<JsonElement>("/api/ops/metrics");
+        Assert.True(snapshot.GetProperty("requests").GetInt64() > 0);
+    }
+
+    [Fact]
     public async Task Validation_endpoint_returns_science_report()
     {
         using var client = factory.CreateClient();
@@ -261,7 +275,7 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
     {
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-Demo-User", "pilot:teacher-01");
-        var submit = await client.PostAsJsonAsync("/api/research-feedback", new ResearchFeedbackRequest("parallax-x", "useful", "Clear enough for a classroom pilot.", "teacher"));
+        var submit = await client.PostAsJsonAsync("/api/research-feedback", new ResearchFeedbackRequest("parallax-x", "useful", "Clear enough for a classroom pilot.", "teacher", "bn", "south-asia"));
         Assert.Equal(HttpStatusCode.OK, submit.StatusCode);
 
         var metrics = await client.GetFromJsonAsync<ResearchFeedbackMetricsResponse>("/api/research-feedback/metrics");
@@ -270,6 +284,23 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
         Assert.True(metrics.UniqueParticipants >= 1);
         Assert.Contains(metrics.Roles!, role => role.Label == "teacher");
         Assert.Contains(metrics.Signals, signal => signal.Label == "useful");
+        Assert.Contains(metrics.Languages!, language => language.Label == "bn");
+        Assert.Contains(metrics.Regions!, region => region.Label == "south-asia");
+    }
+
+    [Fact]
+    public async Task Public_evidence_bundle_is_readable_without_an_editor_session()
+    {
+        using var author = factory.CreateClient();
+        var created = await author.PostAsJsonAsync("/api/public-evidence-bundles", new PublicEvidenceBundleRequest("Test handoff", JsonSerializer.SerializeToElement(new { status = "reviewable" })));
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        var payload = await created.Content.ReadFromJsonAsync<PublicEvidenceBundleCreatedResponse>();
+        Assert.NotNull(payload);
+
+        using var publicClient = factory.CreateClient();
+        var bundle = await publicClient.GetFromJsonAsync<PublicEvidenceBundleResponse>($"/api/public-evidence-bundles/{payload!.BundleId}");
+        Assert.Equal("Test handoff", bundle!.Title);
+        Assert.Equal("reviewable", bundle.Payload.GetProperty("status").GetString());
     }
 
     [Fact]

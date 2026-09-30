@@ -355,9 +355,10 @@ const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const demoUser = typeof window !== 'undefined' ? window.localStorage.getItem('parallax-demo-user') ?? 'demo-user' : 'demo-user';
+  const apiKey = process.env.NEXT_PUBLIC_API_KEY;
   const response = await fetch(`${apiBase}${path}`, {
     ...init,
-    headers: { Accept: 'application/json', 'X-Demo-User': demoUser, ...(init?.headers ?? {}) },
+    headers: { Accept: 'application/json', 'X-Demo-User': demoUser, ...(apiKey ? { 'X-API-Key': apiKey } : {}), ...(init?.headers ?? {}) },
     cache: 'no-store',
   });
   if (!response.ok) {

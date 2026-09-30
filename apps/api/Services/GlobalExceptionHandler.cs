@@ -6,7 +6,7 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        logger.LogError(exception, "Unhandled API exception for {Path}", httpContext.Request.Path);
+        logger.LogError(exception, "Unhandled API exception for {Path} with trace {TraceId}", httpContext.Request.Path, httpContext.TraceIdentifier);
         httpContext.Response.StatusCode = exception switch
         {
             ArgumentException => StatusCodes.Status400BadRequest,

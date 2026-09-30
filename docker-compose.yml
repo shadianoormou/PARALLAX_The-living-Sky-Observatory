@@ -1,16 +1,17 @@
 services:
-  sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: parallax-sqlserver
+  postgres:
+    image: postgres:16-alpine
+    container_name: parallax-postgres
     environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env or your shell}"
+      POSTGRES_DB: parallax
+      POSTGRES_USER: parallax
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env or your shell}"
     ports:
-      - "1433:1433"
+      - "5432:5432"
     volumes:
-      - parallax_sqlserver:/var/opt/mssql
+      - parallax_postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -C -Q \"SELECT 1\" || exit 1"]
+      test: ["CMD-SHELL", "pg_isready -U parallax -d parallax"]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -33,14 +34,17 @@ services:
       dockerfile: apps/api/Dockerfile
     environment:
       ASPNETCORE_URLS: http://+:5080
-      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=Parallax;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True"
+      PARALLAX_DATABASE_PROVIDER: postgres
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=parallax;Username=parallax;Password=${POSTGRES_PASSWORD}"
       ScienceService__BaseUrl: http://science:8001/
       PARALLAX_APPLY_MIGRATIONS: "true"
       PARALLAX_CORS_ORIGINS: http://localhost:3000
+      PARALLAX_REQUIRE_API_KEY: "${PARALLAX_REQUIRE_API_KEY:-false}"
+      PARALLAX_API_KEY: "${PARALLAX_API_KEY:-}"
     ports:
       - "5080:5080"
     depends_on:
-      sqlserver:
+      postgres:
         condition: service_healthy
       science:
         condition: service_healthy
@@ -66,4 +70,4 @@ services:
         condition: service_healthy
 
 volumes:
-  parallax_sqlserver:
+  parallax_postgres:
