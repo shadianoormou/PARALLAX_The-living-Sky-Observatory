@@ -1,0 +1,93 @@
+name: PARALLAX Client Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: mobile/pnpm-lock.yaml
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK platform
+        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: pnpm install --frozen-lockfile --ignore-workspace
+      - name: Sync Capacitor and build APK
+        working-directory: mobile
+        run: pnpm exec cap sync android && pnpm run apk:debug
+      - name: Prepare APK artifact
+        run: cp mobile/android/app/build/outputs/apk/debug/app-debug.apk PARALLAX-Observatory-live-backend-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-client
+          path: PARALLAX-Observatory-live-backend-debug.apk
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: pnpm install --frozen-lockfile --ignore-workspace
+      - name: Build Windows ZIP and installer
+        working-directory: desktop
+        run: pnpm run dist:win
+      - name: Prepare Windows artifacts
+        shell: pwsh
+        run: |
+          Copy-Item desktop/dist/PARALLAX-Observatory-0.1.0-win-x64.zip PARALLAX-Observatory-live-backend-win-x64.zip
+          Copy-Item desktop/dist/PARALLAX-Observatory-0.1.0-win-x64.exe PARALLAX-Observatory-live-backend-win-x64.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-client
+          path: |
+            PARALLAX-Observatory-live-backend-win-x64.zip
+            PARALLAX-Observatory-live-backend-win-x64.exe
+
+  release:
+    needs: [android, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: PARALLAX Observatory ${{ github.ref_name }}
+          body: |
+            Live client release connected to the Vercel frontend and Render API/PostgreSQL backend.
+
+            - Frontend: https://parallax-the-living-sky-observatory.vercel.app
+            - API readiness: https://parallax-api-x19b.onrender.com/health/ready
+            - Android and Windows clients require an internet connection.
+          files: release-assets/*
+          fail_on_unmatched_files: true
