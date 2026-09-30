@@ -195,6 +195,9 @@ export type SpherexEvidenceGraph = {
     consistency_status: string;
     matched_candidate_groups: number;
     processing_mode: string;
+    elapsed_seconds: number;
+    slowest_band_seconds: number;
+    cache_hits: number;
   };
   bands: SpherexEvidenceBand[];
   cross_band_consistency: {
@@ -204,6 +207,17 @@ export type SpherexEvidenceGraph = {
   };
   graph: { nodes: Array<JsonObject>; edges: Array<JsonObject> };
   limitations: string[];
+};
+
+export type SpherexEvidenceGraphJob = {
+  job_id: string;
+  status: 'queued' | 'processing' | 'complete' | 'error' | string;
+  requested_bands: number;
+  created_at_utc: string;
+  updated_at_utc: string;
+  poll_url?: string;
+  result?: SpherexEvidenceGraph;
+  error?: string;
 };
 
 export type Achievement = {
@@ -364,6 +378,10 @@ export const parallaxApi = {
   evidenceGraphSpherex: (request: SpherexEvidenceGraphRequest) => fetchJson<SpherexEvidenceGraph>('/api/archive/spherex/evidence-graph', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request),
   }),
+  queueEvidenceGraphSpherex: (request: SpherexEvidenceGraphRequest) => fetchJson<SpherexEvidenceGraphJob>('/api/archive/spherex/evidence-graph/jobs', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request),
+  }),
+  getEvidenceGraphJob: (jobId: string) => fetchJson<SpherexEvidenceGraphJob>(`/api/archive/spherex/evidence-graph/jobs/${encodeURIComponent(jobId)}`),
 };
 
 export function getNumber(measurements: Measurement[], metricName: string) {

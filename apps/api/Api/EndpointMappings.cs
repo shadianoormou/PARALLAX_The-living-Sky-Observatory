@@ -155,6 +155,12 @@ public static class EndpointMappings
         app.MapPost("/api/archive/spherex/evidence-graph", async (SpherexEvidenceGraphRequest body, IScienceServiceClient science, CancellationToken cancellationToken) =>
             Results.Ok(await science.EvidenceGraphSpherexAsync(body, cancellationToken)));
 
+        app.MapPost("/api/archive/spherex/evidence-graph/jobs", async (SpherexEvidenceGraphRequest body, IScienceServiceClient science, CancellationToken cancellationToken) =>
+            Results.Accepted(value: await science.QueueEvidenceGraphSpherexAsync(body, cancellationToken)));
+
+        app.MapGet("/api/archive/spherex/evidence-graph/jobs/{jobId}", async (string jobId, IScienceServiceClient science, CancellationToken cancellationToken) =>
+            Results.Ok(await science.GetEvidenceGraphJobAsync(jobId, cancellationToken)));
+
         app.MapPost("/api/research-feedback", async (ResearchFeedbackRequest body, HttpRequest request, ParallaxDbContext db, CancellationToken cancellationToken) =>
         {
             var signal = body.Signal.Trim().ToLowerInvariant();

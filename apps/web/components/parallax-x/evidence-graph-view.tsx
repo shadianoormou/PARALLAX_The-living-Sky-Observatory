@@ -12,6 +12,7 @@ export function EvidenceGraphView() {
   const [bands, setBands] = useState(['SPHEREx-D3', 'SPHEREx-D4', 'SPHEREx-D5']);
   const [report, setReport] = useState<SpherexEvidenceGraph | null>(null);
   const [loading, setLoading] = useState(false);
+  const [jobStatus, setJobStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<CommunityMetrics | null>(null);
   const [feedbackMetrics, setFeedbackMetrics] = useState<ResearchFeedbackMetrics | null>(null);
@@ -35,22 +36,35 @@ export function EvidenceGraphView() {
   }
 
   async function run() {
-    if (bands.length < 2) {
+    if (bands.length < 2 || !Number.isFinite(Number(ra)) || !Number.isFinite(Number(dec))) {
       setError('Select at least two SPHEREx bands so the evidence chain has a comparison context.');
       return;
     }
     setLoading(true);
     setError(null);
     setShareMessage(null);
+    setJobStatus('queued');
     try {
-      const nextReport = await parallaxApi.evidenceGraphSpherex({ ra_deg: Number(ra), dec_deg: Number(dec), bands });
-      setReport(nextReport);
+      const request = { ra_deg: Number(ra), dec_deg: Number(dec), bands };
+      const queued = await parallaxApi.queueEvidenceGraphSpherex(request);
+      setJobStatus(queued.status);
+      let latest = queued;
+      for (let attempt = 0; attempt < 240; attempt += 1) {
+        if (latest.status === 'complete' || latest.status === 'error') break;
+        await new Promise((resolve) => window.setTimeout(resolve, 1500));
+        latest = await parallaxApi.getEvidenceGraphJob(queued.job_id);
+        setJobStatus(latest.status);
+      }
+      if (latest.status === 'error') throw new Error(latest.error ?? 'The archive job failed.');
+      if (!latest.result) throw new Error('The archive job did not finish within the review window.');
+      setReport(latest.result);
       const params = new URLSearchParams({ ra, dec, bands: bands.join(',') });
       window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
     } catch (caught) {
       setError(caught instanceof ParallaxApiError ? caught.message : caught instanceof Error ? caught.message : 'The evidence graph is unavailable.');
     } finally {
       setLoading(false);
+      setJobStatus(null);
     }
   }
 
@@ -64,6 +78,23 @@ export function EvidenceGraphView() {
     link.click();
     URL.revokeObjectURL(url);
     setShareMessage('Evidence JSON downloaded.');
+  }
+
+  function downloadCsv() {
+    if (!report) return;
+    const quote = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`;
+    const rows = [
+      ['band', 'status', 'epochs', 'candidate_count', 'screened_count', 'valid_pixel_fraction', 'registration_error', 'cache_hit', 'error'],
+      ...report.bands.map((item) => [item.band, item.status, item.epochs.join(' → '), item.candidate_count, item.screened_count, Array.isArray(item.quality.valid_pixel_fraction) ? item.quality.valid_pixel_fraction.join(' / ') : '', item.quality.registration_error ?? '', item.cache_hit ?? false, item.error ?? '']),
+    ];
+    const csv = rows.map((row) => row.map(quote).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `parallax-x-${ra}-${dec}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setShareMessage('Evidence CSV downloaded.');
   }
 
   async function copyShareLink() {
@@ -115,17 +146,17 @@ export function EvidenceGraphView() {
     </section>
 
     {!report && !loading && <section className="grid gap-4 md:grid-cols-3"><InfoCard label="1 / Query" text="One sky position, repeated across selected SPHEREx bands." /><InfoCard label="2 / Gate" text="Every epoch pair is checked for dimensions, flags, overlap, and registration." /><InfoCard label="3 / Review" text="The result preserves provenance, screened residuals, and honest null results." /></section>}
-    {loading && <div className="panel p-8 text-sm text-[var(--muted)]">Discovering public IRSA products and measuring each selected band independently…</div>}
-    {report && <Report report={report} metrics={metrics} feedbackMetrics={feedbackMetrics} feedbackMessage={feedbackMessage} onFeedback={sendFeedback} onDownload={downloadEvidence} onCopyLink={() => void copyShareLink()} shareMessage={shareMessage} />}
+    {loading && <div className="panel p-8 text-sm text-[var(--muted)]">Archive job: <span className="mono text-[var(--cyan)]">{jobStatus ?? 'queued'}</span>. Reading public IRSA products and measuring each selected band independently…</div>}
+    {report && <Report report={report} metrics={metrics} feedbackMetrics={feedbackMetrics} feedbackMessage={feedbackMessage} onFeedback={sendFeedback} onDownload={downloadEvidence} onDownloadCsv={downloadCsv} onCopyLink={() => void copyShareLink()} shareMessage={shareMessage} />}
   </div>;
 }
 
-function Report({ report, metrics, feedbackMetrics, feedbackMessage, onFeedback, onDownload, onCopyLink, shareMessage }: { report: SpherexEvidenceGraph; metrics: CommunityMetrics | null; feedbackMetrics: ResearchFeedbackMetrics | null; feedbackMessage: string | null; onFeedback: (signal: 'useful' | 'unclear' | 'would-share') => void; onDownload: () => void; onCopyLink: () => void; shareMessage: string | null }) {
+function Report({ report, metrics, feedbackMetrics, feedbackMessage, onFeedback, onDownload, onDownloadCsv, onCopyLink, shareMessage }: { report: SpherexEvidenceGraph; metrics: CommunityMetrics | null; feedbackMetrics: ResearchFeedbackMetrics | null; feedbackMessage: string | null; onFeedback: (signal: 'useful' | 'unclear' | 'would-share') => void; onDownload: () => void; onDownloadCsv: () => void; onCopyLink: () => void; shareMessage: string | null }) {
   const summary = report.summary;
   return <div className="space-y-6">
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6"><Metric label="Bands" value={String(summary.bands_requested)} tone="cyan" /><Metric label="Ready" value={String(summary.bands_ready)} tone="signal" /><Metric label="Caution / blocked" value={`${summary.bands_caution} / ${summary.bands_blocked}`} tone={summary.bands_blocked ? 'amber' : 'cyan'} /><Metric label="Errors" value={String(summary.bands_error)} tone={summary.bands_error ? 'amber' : 'signal'} /><Metric label="Candidates" value={String(summary.total_candidates)} tone="signal" /><Metric label="Consistency" value={summary.consistency_status.replaceAll('_', ' ')} tone={summary.matched_candidate_groups ? 'signal' : 'cyan'} /></div>
     <section className="panel p-5 sm:p-7">
-      <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="eyebrow">TARGET EVIDENCE CHAIN</p><h2 className="mt-3 text-xl font-medium text-[var(--ink)]">{report.target.ra_deg.toFixed(5)}°, {report.target.dec_deg.toFixed(5)}°</h2><p className="mt-2 text-xs text-[var(--quiet)]">{report.summary.processing_mode}</p></div><div className="flex flex-wrap items-center gap-2"><span className="mono border border-[var(--line)] px-3 py-2 text-[9px] uppercase tracking-[.1em] text-[var(--quiet)]">{report.graph.nodes.length} nodes / {report.graph.edges.length} links</span><button type="button" onClick={onCopyLink} className="focus-ring border border-[var(--line-strong)] px-3 py-2 mono text-[9px] uppercase tracking-[.1em] text-[var(--cyan)]">Copy review link</button><button type="button" onClick={onDownload} className="focus-ring bg-[var(--cyan)] px-3 py-2 mono text-[9px] uppercase tracking-[.1em] text-[var(--void)]">Export JSON</button></div></div>
+      <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="eyebrow">TARGET EVIDENCE CHAIN</p><h2 className="mt-3 text-xl font-medium text-[var(--ink)]">{report.target.ra_deg.toFixed(5)}°, {report.target.dec_deg.toFixed(5)}°</h2><p className="mt-2 text-xs text-[var(--quiet)]">{report.summary.processing_mode} · {report.summary.elapsed_seconds.toFixed(1)}s total · {report.summary.cache_hits} cache hit(s)</p></div><div className="flex flex-wrap items-center gap-2"><span className="mono border border-[var(--line)] px-3 py-2 text-[9px] uppercase tracking-[.1em] text-[var(--quiet)]">{report.graph.nodes.length} nodes / {report.graph.edges.length} links</span><button type="button" onClick={onCopyLink} className="focus-ring border border-[var(--line-strong)] px-3 py-2 mono text-[9px] uppercase tracking-[.1em] text-[var(--cyan)]">Copy review link</button><button type="button" onClick={onDownload} className="focus-ring bg-[var(--cyan)] px-3 py-2 mono text-[9px] uppercase tracking-[.1em] text-[var(--void)]">Export JSON</button><button type="button" onClick={onDownloadCsv} className="focus-ring border border-[var(--line-strong)] px-3 py-2 mono text-[9px] uppercase tracking-[.1em] text-[var(--cyan)]">Export CSV</button></div></div>
       <div className="mt-6 space-y-3">{report.bands.map((item) => <BandCard key={item.band} item={item} />)}</div>
       {shareMessage && <p className="mt-4 text-xs text-[var(--signal)]">{shareMessage}</p>}
     </section>

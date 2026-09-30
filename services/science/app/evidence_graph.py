@@ -14,6 +14,9 @@ from threading import RLock
 from time import perf_counter, monotonic
 from typing import Any, Callable
 
+from astropy.io.fits import Header
+from astropy.wcs import WCS
+
 from .adapters import ArchiveAdapterError, SpherexIrsaAdapter
 from .pipeline import ObservationValidationError, analyze_observations
 
@@ -42,8 +45,8 @@ def _edge(source: str, target: str, relation: str, **extra: Any) -> dict[str, An
     return {"from": source, "to": target, "relation": relation, **extra}
 
 
-def _candidate_anchor(candidate: dict[str, Any], shape: tuple[int, int]) -> tuple[float, float] | None:
-    """Return a normalized cutout position when the detector measured one."""
+def _candidate_anchor(candidate: dict[str, Any], metadata: dict[str, Any], shape: tuple[int, int]) -> dict[str, Any] | None:
+    """Return a WCS sky position when available, otherwise a pixel fallback."""
 
     measurement = candidate.get("measurement", {})
     position = measurement.get("position_xy")
@@ -56,7 +59,20 @@ def _candidate_anchor(candidate: dict[str, Any], shape: tuple[int, int]) -> tupl
     height, width = shape
     if width <= 0 or height <= 0:
         return None
-    return (float(position[0]) / width, float(position[1]) / height)
+    normalized = (float(position[0]) / width, float(position[1]) / height)
+    anchor: dict[str, Any] = {"position": normalized, "coordinate_mode": "pixel-fallback"}
+    wcs_values = metadata.get("wcs")
+    if isinstance(wcs_values, dict) and {"CTYPE1", "CTYPE2", "CRVAL1", "CRVAL2", "CRPIX1", "CRPIX2"}.issubset(wcs_values):
+        try:
+            header = Header()
+            for key, value in wcs_values.items():
+                header[key] = value
+            world = WCS(header).pixel_to_world_values(float(position[0]), float(position[1]))
+            anchor["world_position"] = [float(world[0] % 360.0), float(world[1])]
+            anchor["coordinate_mode"] = "wcs"
+        except (ValueError, TypeError, KeyError):
+            pass
+    return anchor
 
 
 def _cross_band_consistency(results: list[dict[str, Any]]) -> dict[str, Any]:
@@ -71,7 +87,18 @@ def _cross_band_consistency(results: list[dict[str, Any]]) -> dict[str, Any]:
         }
     groups: list[dict[str, Any]] = []
     for anchor in anchors:
-        matching = next((group for group in groups if anchor["band"] not in group["band_set"] and ((group["position"][0] - anchor["position"][0]) ** 2 + (group["position"][1] - anchor["position"][1]) ** 2) ** 0.5 <= 0.08), None)
+        def close_enough(group: dict[str, Any]) -> bool:
+            if anchor["band"] in group["band_set"]:
+                return False
+            reference = group["candidates"][0]
+            if anchor["coordinate_mode"] == "wcs" and reference["coordinate_mode"] == "wcs":
+                ra_delta = abs(anchor["world_position"][0] - reference["world_position"][0])
+                ra_delta = min(ra_delta, 360.0 - ra_delta)
+                dec_delta = abs(anchor["world_position"][1] - reference["world_position"][1])
+                return (ra_delta**2 + dec_delta**2) ** 0.5 <= 0.002
+            return anchor["coordinate_mode"] == reference["coordinate_mode"] == "pixel-fallback" and ((group["position"][0] - anchor["position"][0]) ** 2 + (group["position"][1] - anchor["position"][1]) ** 2) ** 0.5 <= 0.08
+
+        matching = next((group for group in groups if close_enough(group)), None)
         if matching is None:
             groups.append({"band_set": {anchor["band"]}, "position": anchor["position"], "candidates": [anchor]})
         elif anchor["band"] not in matching["band_set"]:
@@ -82,15 +109,16 @@ def _cross_band_consistency(results: list[dict[str, Any]]) -> dict[str, Any]:
             "group_id": f"cross-band-{index}",
             "bands": sorted(group["band_set"]),
             "candidate_ids": [item["candidate_id"] for item in group["candidates"]],
+            "coordinate_mode": group["candidates"][0]["coordinate_mode"],
             "position_normalized": [round(sum(item["position"][0] for item in group["candidates"]) / len(group["candidates"]), 4), round(sum(item["position"][1] for item in group["candidates"]) / len(group["candidates"]), 4)],
         }
         for index, group in enumerate(groups, start=1)
         if len(group["band_set"]) >= 2
     ]
     return {
-        "status": "MULTI-BAND CONSISTENT" if matched_groups else "SINGLE-BAND ONLY",
+        "status": ("MULTI-BAND WCS CONSISTENT" if any(group["coordinate_mode"] == "wcs" for group in matched_groups) else "MULTI-BAND PIXEL-ALIGNED") if matched_groups else "SINGLE-BAND ONLY",
         "matched_groups": matched_groups,
-        "method": "Exploratory normalized cutout-position association within 8% of the cutout; not a WCS-confirmed source match.",
+        "method": "WCS sky-coordinate association within 0.002 degrees when archive WCS is complete; otherwise normalized cutout-position association within 8%. Pixel fallback is not WCS-confirmed.",
     }
 
 
@@ -137,9 +165,9 @@ def _run_band_analysis(
             "candidates": candidates,
             "screened_candidates": analysis["screened_candidates"],
             "_anchors": [
-                {"band": band, "candidate_id": candidate.get("candidate_id", "candidate"), "position": anchor}
+                {"band": band, "candidate_id": candidate.get("candidate_id", "candidate"), **anchor}
                 for candidate in candidates
-                if (anchor := _candidate_anchor(candidate, shape)) is not None
+                if (anchor := _candidate_anchor(candidate, pair.epoch_a.metadata, shape)) is not None
             ],
             "elapsed_seconds": round(perf_counter() - started, 3),
             "cache_hit": False,
@@ -178,6 +206,7 @@ def build_spherex_evidence_graph(
 ) -> dict[str, Any]:
     """Build a provenance-preserving graph of independent band analyses."""
 
+    started = perf_counter()
     ra_deg = float(target["ra_deg"] % 360.0)
     dec_deg = float(target["dec_deg"])
     requested_bands = [band.strip() for band in bands if band.strip()]
@@ -244,6 +273,9 @@ def build_spherex_evidence_graph(
             "consistency_status": consistency["status"],
             "matched_candidate_groups": len(consistency["matched_groups"]),
             "processing_mode": "parallel per-band analysis with 180-second metadata cache",
+            "elapsed_seconds": round(perf_counter() - started, 3),
+            "slowest_band_seconds": round(max((item["elapsed_seconds"] for item in results), default=0.0), 3),
+            "cache_hits": sum(bool(item.get("cache_hit")) for item in results),
         },
         "bands": results,
         "cross_band_consistency": consistency,

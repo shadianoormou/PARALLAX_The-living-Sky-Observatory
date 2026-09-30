@@ -70,6 +70,8 @@ public sealed class FakeScienceServiceClient : IScienceServiceClient
     public Task<JsonElement> AnalyzeSpherexAsync(SpherexArchiveRequest request, CancellationToken cancellationToken) => Task.FromResult(JsonSerializer.SerializeToElement(new { source = "NASA SPHEREx / IRSA", analysis = new { comparison = new { status = "READY TO COMPARE" } } }));
     public Task<JsonElement> ValidateSpherexAsync(SpherexValidationRequest request, CancellationToken cancellationToken) => Task.FromResult(JsonSerializer.SerializeToElement(new { suite = "SPHEREx live multi-field validation", requested_fields = request.Fields.Count, ready_fields = request.Fields.Count }));
     public Task<JsonElement> EvidenceGraphSpherexAsync(SpherexEvidenceGraphRequest request, CancellationToken cancellationToken) => Task.FromResult(JsonSerializer.SerializeToElement(new { suite = "PARALLAX X SPHEREx Evidence Graph", summary = new { bands_requested = request.Bands?.Count ?? 0, total_candidates = 0 } }));
+    public Task<JsonElement> QueueEvidenceGraphSpherexAsync(SpherexEvidenceGraphRequest request, CancellationToken cancellationToken) => Task.FromResult(JsonSerializer.SerializeToElement(new { job_id = "test-job", status = "queued", requested_bands = request.Bands?.Count ?? 0 }));
+    public Task<JsonElement> GetEvidenceGraphJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(JsonSerializer.SerializeToElement(new { job_id = jobId, status = "complete", result = new { suite = "PARALLAX X SPHEREx Evidence Graph" } }));
 
     public Task<ScienceAnalysisResponse> AnalyzeAsync(ScienceProcessRequest request, CancellationToken cancellationToken)
     {
@@ -235,6 +237,23 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("PARALLAX X SPHEREx Evidence Graph", payload.GetProperty("suite").GetString());
         Assert.Equal(2, payload.GetProperty("summary").GetProperty("bands_requested").GetInt32());
+    }
+
+    [Fact]
+    public async Task Spherex_evidence_graph_job_lifecycle_is_proxied()
+    {
+        using var client = factory.CreateClient();
+        var request = new SpherexEvidenceGraphRequest(127.69, -39.17, Bands: ["SPHEREx-D3", "SPHEREx-D4"]);
+        var queued = await client.PostAsJsonAsync("/api/archive/spherex/evidence-graph/jobs", request);
+        Assert.Equal(HttpStatusCode.Accepted, queued.StatusCode);
+        var queuedPayload = await queued.Content.ReadFromJsonAsync<JsonElement>();
+        var jobId = queuedPayload.GetProperty("job_id").GetString();
+        Assert.Equal("queued", queuedPayload.GetProperty("status").GetString());
+
+        var status = await client.GetAsync($"/api/archive/spherex/evidence-graph/jobs/{jobId}");
+        Assert.Equal(HttpStatusCode.OK, status.StatusCode);
+        var statusPayload = await status.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("complete", statusPayload.GetProperty("status").GetString());
     }
 
     [Fact]

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
+from threading import RLock
 from typing import Any, Literal
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -64,6 +68,32 @@ app = FastAPI(
     version="0.2.0",
     description="Measurement service for the deterministic synthetic demonstration dataset.",
 )
+
+_EVIDENCE_JOB_EXECUTOR = ThreadPoolExecutor(max_workers=2)
+_EVIDENCE_JOBS: dict[str, dict[str, Any]] = {}
+_EVIDENCE_JOBS_LOCK = RLock()
+_MAX_ACTIVE_EVIDENCE_JOBS = 4
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _run_evidence_job(job_id: str, request: dict[str, Any]) -> None:
+    with _EVIDENCE_JOBS_LOCK:
+        _EVIDENCE_JOBS[job_id]["status"] = "processing"
+        _EVIDENCE_JOBS[job_id]["updated_at_utc"] = _utc_now()
+    try:
+        result = build_spherex_evidence_graph({"ra_deg": request["ra_deg"], "dec_deg": request["dec_deg"]}, request["bands"], radius_deg=request["radius_deg"], collection=request["collection"], cutout_size_deg=request["cutout_size_deg"], max_results=request["max_results"])
+        with _EVIDENCE_JOBS_LOCK:
+            _EVIDENCE_JOBS[job_id].update({"status": "complete", "result": result, "updated_at_utc": _utc_now()})
+    except Exception as error:  # preserve an explicit terminal state for unexpected archive failures
+        with _EVIDENCE_JOBS_LOCK:
+            _EVIDENCE_JOBS[job_id].update({"status": "error", "error": f"Evidence graph job failed: {error}", "updated_at_utc": _utc_now()})
+
+
+def _job_snapshot(job: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in job.items() if key != "future"}
 
 
 def _dataset(request: ProcessRequest):
@@ -163,6 +193,33 @@ def spherex_evidence_graph(request: SpherexEvidenceGraphRequest) -> dict:
         cutout_size_deg=request.cutout_size_deg,
         max_results=request.max_results,
     )
+
+
+@app.post("/archive/spherex/evidence-graph/jobs", status_code=202)
+def queue_spherex_evidence_graph(request: SpherexEvidenceGraphRequest) -> dict:
+    """Queue a bounded background job so archive work does not block a browser request."""
+
+    if any(not band.strip() for band in request.bands):
+        raise HTTPException(status_code=422, detail="bands must contain non-empty names")
+    with _EVIDENCE_JOBS_LOCK:
+        active = sum(item["status"] in {"queued", "processing"} for item in _EVIDENCE_JOBS.values())
+        if active >= _MAX_ACTIVE_EVIDENCE_JOBS:
+            raise HTTPException(status_code=429, detail="Too many archive jobs are active; retry after the current queue drains.", headers={"Retry-After": "5"})
+        job_id = uuid4().hex
+        created_at = _utc_now()
+        job = {"job_id": job_id, "status": "queued", "created_at_utc": created_at, "updated_at_utc": created_at, "requested_bands": len(request.bands), "poll_url": f"/archive/spherex/evidence-graph/jobs/{job_id}"}
+        _EVIDENCE_JOBS[job_id] = job
+        job["future"] = _EVIDENCE_JOB_EXECUTOR.submit(_run_evidence_job, job_id, request.model_dump())
+        return _job_snapshot(job)
+
+
+@app.get("/archive/spherex/evidence-graph/jobs/{job_id}")
+def get_spherex_evidence_graph_job(job_id: str) -> dict:
+    with _EVIDENCE_JOBS_LOCK:
+        job = _EVIDENCE_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Evidence graph job not found.")
+        return _job_snapshot(job)
 
 
 @app.post("/process/register")

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from services.science.app.adapters import ArchiveAdapterError, SpherexPair
-from services.science.app.evidence_graph import build_spherex_evidence_graph
+from services.science.app.evidence_graph import _candidate_anchor, build_spherex_evidence_graph
 from services.science.app.synthetic import generate_synthetic_dataset
 
 
@@ -33,7 +33,7 @@ def test_evidence_graph_preserves_each_band_and_null_result():
     assert all(item["epochs"] == ["D3-A", "D3-B"] for item in report["bands"])
     assert any(edge["relation"] == "measured" for edge in report["graph"]["edges"])
     assert any(node["type"] == "quality" for node in report["graph"]["nodes"])
-    assert report["summary"]["consistency_status"] == "MULTI-BAND CONSISTENT"
+    assert report["summary"]["consistency_status"] == "MULTI-BAND PIXEL-ALIGNED"
     assert report["summary"]["matched_candidate_groups"] == 2
 
 
@@ -47,3 +47,15 @@ def test_evidence_graph_keeps_archive_errors_visible():
     assert all(item["status"] == "ERROR" for item in report["bands"])
     assert len([node for node in report["graph"]["nodes"] if node["type"] == "error"]) == 2
     assert report["cross_band_consistency"]["status"] == "NO PROMOTED CANDIDATES"
+
+
+def test_candidate_anchor_prefers_complete_wcs_metadata():
+    anchor = _candidate_anchor(
+        {"measurement": {"position_xy": [10.0, 10.0]}},
+        {"wcs": {"CTYPE1": "RA---TAN", "CTYPE2": "DEC--TAN", "CRVAL1": 127.0, "CRVAL2": -39.0, "CRPIX1": 10.0, "CRPIX2": 10.0, "CDELT1": -0.0001, "CDELT2": 0.0001}},
+        (20, 20),
+    )
+
+    assert anchor is not None
+    assert anchor["coordinate_mode"] == "wcs"
+    assert len(anchor["world_position"]) == 2

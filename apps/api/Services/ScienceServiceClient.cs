@@ -12,6 +12,8 @@ public interface IScienceServiceClient
     Task<JsonElement> AnalyzeSpherexAsync(SpherexArchiveRequest request, CancellationToken cancellationToken);
     Task<JsonElement> ValidateSpherexAsync(SpherexValidationRequest request, CancellationToken cancellationToken);
     Task<JsonElement> EvidenceGraphSpherexAsync(SpherexEvidenceGraphRequest request, CancellationToken cancellationToken);
+    Task<JsonElement> QueueEvidenceGraphSpherexAsync(SpherexEvidenceGraphRequest request, CancellationToken cancellationToken);
+    Task<JsonElement> GetEvidenceGraphJobAsync(string jobId, CancellationToken cancellationToken);
 }
 
 public sealed class ScienceServiceClient(HttpClient httpClient, ILogger<ScienceServiceClient> logger) : IScienceServiceClient
@@ -56,9 +58,29 @@ public sealed class ScienceServiceClient(HttpClient httpClient, ILogger<ScienceS
     public Task<JsonElement> EvidenceGraphSpherexAsync(SpherexEvidenceGraphRequest request, CancellationToken cancellationToken) =>
         PostJsonAsync("archive/spherex/evidence-graph", request, "SPHEREx evidence graph", cancellationToken);
 
+    public Task<JsonElement> QueueEvidenceGraphSpherexAsync(SpherexEvidenceGraphRequest request, CancellationToken cancellationToken) =>
+        PostJsonAsync("archive/spherex/evidence-graph/jobs", request, "SPHEREx evidence graph queue", cancellationToken);
+
+    public Task<JsonElement> GetEvidenceGraphJobAsync(string jobId, CancellationToken cancellationToken) =>
+        GetJsonAsync($"archive/spherex/evidence-graph/jobs/{Uri.EscapeDataString(jobId)}", "SPHEREx evidence graph job", cancellationToken);
+
     private async Task<JsonElement> PostJsonAsync<T>(string path, T request, string operation, CancellationToken cancellationToken)
     {
         using var response = await httpClient.PostAsJsonAsync(path, request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogWarning("{Operation} returned {StatusCode}: {Body}", operation, response.StatusCode, body);
+            throw new HttpRequestException($"{operation} returned {(int)response.StatusCode}: {body}");
+        }
+
+        using var document = JsonDocument.Parse(body);
+        return document.RootElement.Clone();
+    }
+
+    private async Task<JsonElement> GetJsonAsync(string path, string operation, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync(path, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {

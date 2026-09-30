@@ -18,6 +18,7 @@ This is the Phase 8 release gate. It records what was verified locally and what 
 - [x] The judge flow exposes cautious cross-band consistency associations and a measured impact path without inventing adoption numbers.
 - [x] Researcher handoff supports shareable query links, JSON evidence export, and persisted opt-in pilot feedback.
 - [x] Multi-band evidence processing is bounded-parallel and uses a short-lived cache for repeat review without caching archive errors.
+- [x] Best-technology path supports asynchronous job polling, archive retry/backoff, active-job rate limiting, WCS-first association with labeled pixel fallback, timing/cache benchmarks, and JSON/CSV export.
 - [x] Privacy-preserving community adoption metrics are persisted and displayed from real classification rows.
 
 ## Operations and security

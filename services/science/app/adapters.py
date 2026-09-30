@@ -167,11 +167,16 @@ class SpherexIrsaAdapter:
                     response.raise_for_status()
                     break
                 except httpx.HTTPStatusError as error:
-                    if error.response.status_code in {502, 503, 504} and attempt < 2:
-                        time.sleep(attempt + 1)
+                    if error.response.status_code in {429, 502, 503, 504} and attempt < 2:
+                        retry_after = error.response.headers.get("retry-after")
+                        delay = float(retry_after) if retry_after and retry_after.replace(".", "", 1).isdigit() else attempt + 1
+                        time.sleep(min(delay, 8.0))
                         continue
                     raise ArchiveAdapterError(f"IRSA SIA query failed: {error}") from error
                 except httpx.HTTPError as error:
+                    if attempt < 2:
+                        time.sleep(attempt + 1)
+                        continue
                     raise ArchiveAdapterError(f"IRSA SIA query failed: {error}") from error
         finally:
             if owns_client:
@@ -310,7 +315,7 @@ class SpherexIrsaAdapter:
             "nominal_flag_mask": 1 << 21,
             "median_variance": variance_median,
             "quality_flags_present": flags is not None,
-            "wcs": {key: header[key] for key in ("CTYPE1", "CTYPE2", "CRVAL1", "CRVAL2") if key in header},
+            "wcs": {key: header[key] for key in ("WCSAXES", "CTYPE1", "CTYPE2", "CRVAL1", "CRVAL2", "CRPIX1", "CRPIX2", "CDELT1", "CDELT2", "CD1_1", "CD1_2", "CD2_1", "CD2_2", "PC1_1", "PC1_2", "PC2_1", "PC2_2") if key in header},
             "provenance_status": "real SPHEREx archive cutout; source and retrieval metadata preserved",
         }
         return Observation(image.astype(np.float32), metadata, {}, variance=variance, flags=flags)
@@ -324,23 +329,36 @@ class SpherexIrsaAdapter:
             client = self._http_client()
             owns_client = client is not self._client
             try:
-                try:
-                    with client.stream("GET", url) as response:
-                        response.raise_for_status()
-                        content_length = int(response.headers.get("content-length", "0") or 0)
-                        if content_length > 32 * 1024 * 1024:
-                            raise ArchiveAdapterError("SPHEREx cutout exceeds the 32 MB safety limit.")
-                        chunks: list[bytes] = []
-                        size = 0
-                        for chunk in response.iter_bytes():
-                            size += len(chunk)
-                            if size > 32 * 1024 * 1024:
+                for attempt in range(3):
+                    try:
+                        with client.stream("GET", url) as response:
+                            response.raise_for_status()
+                            content_length = int(response.headers.get("content-length", "0") or 0)
+                            if content_length > 32 * 1024 * 1024:
                                 raise ArchiveAdapterError("SPHEREx cutout exceeds the 32 MB safety limit.")
-                            chunks.append(chunk)
-                        payload = b"".join(chunks)
-                except httpx.HTTPError as error:
-                    raise ArchiveAdapterError(f"SPHEREx cutout download failed: {error}") from error
-                timestamp = datetime.now(timezone.utc).isoformat()
+                            chunks: list[bytes] = []
+                            size = 0
+                            for chunk in response.iter_bytes():
+                                size += len(chunk)
+                                if size > 32 * 1024 * 1024:
+                                    raise ArchiveAdapterError("SPHEREx cutout exceeds the 32 MB safety limit.")
+                                chunks.append(chunk)
+                            payload = b"".join(chunks)
+                        timestamp = datetime.now(timezone.utc).isoformat()
+                        break
+                    except httpx.HTTPStatusError as error:
+                        retryable = error.response.status_code in {429, 502, 503, 504}
+                        if retryable and attempt < 2:
+                            retry_after = error.response.headers.get("retry-after")
+                            delay = float(retry_after) if retry_after and retry_after.replace(".", "", 1).isdigit() else 2 ** attempt
+                            time.sleep(min(delay, 8.0))
+                            continue
+                        raise ArchiveAdapterError(f"SPHEREx cutout download failed with HTTP {error.response.status_code}.") from error
+                    except httpx.HTTPError as error:
+                        if attempt < 2:
+                            time.sleep(2 ** attempt)
+                            continue
+                        raise ArchiveAdapterError(f"SPHEREx cutout download failed: {error}") from error
             finally:
                 if owns_client:
                     client.close()
