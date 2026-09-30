@@ -30,6 +30,16 @@ The public `v0.1.0` release contains the two installable client packages:
 
 These binaries are convenience shells around the public web observatory. They do not bundle the archive-processing backend or claim offline scientific analysis.
 
+### Live-backend client builds
+
+The rebuilt clients below open the Vercel production frontend, which is connected to the globally hosted Render API and PostgreSQL stack:
+
+- Android: `PARALLAX-Observatory-live-backend-debug.apk`
+- Windows x64 portable: `PARALLAX-Observatory-live-backend-win-x64.zip`
+- Windows x64 installer: `PARALLAX-Observatory-live-backend-win-x64.exe`
+
+These clients require an internet connection. The Android shell configuration is in [mobile/capacitor.config.ts](./mobile/capacitor.config.ts), and the Windows shell target is defined in [desktop/main.cjs](./desktop/main.cjs).
+
 ## Why PARALLAX exists
 
 Time-domain astronomy finds meaning in change: movement, fading, brightening, and unexpected residuals across repeated observations. The same comparison can also be fooled by bad pixels, cosmic rays, incomplete coverage, registration error, or low signal-to-noise.
