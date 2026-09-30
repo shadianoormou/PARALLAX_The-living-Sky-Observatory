@@ -9,7 +9,8 @@ This is the short, honest route a judge can use without reading the repository.
 3. Open `/citizen-science`, submit a label with confidence, and inspect the vote-gated consensus behavior.
 4. Open `/provenance` to follow candidate → processing run → source → epochs → Comparison Guard.
 5. Open `/spherex` and use the prefilled coordinate to query two public SPHEREx epochs through IRSA. The real-data path displays archive metadata, quality coverage, bounded FITS previews, measurements, and provenance.
-6. Open `/validation` to see the five deterministic regression cases and their measured errors.
+6. Open `/parallax-x`, select at least two bands, and build the same-target evidence graph. Review which bands are ready, blocked, errored, or null results before interpreting a candidate.
+7. Open `/validation` to see the five deterministic regression cases and their measured errors.
 
 ## What is scientifically claimed
 

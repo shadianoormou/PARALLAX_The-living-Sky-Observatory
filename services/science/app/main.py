@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from .adapters import ArchiveAdapterError, SpherexIrsaAdapter, image_preview
 from .archive_validation import SpherexValidationField, validate_spherex_fields
+from .evidence_graph import build_spherex_evidence_graph
 from .pipeline import ObservationValidationError, analyze_observations, assess_comparison_metadata, detect_candidates, difference_observations, register_observations, run_validation_suite
 from .serialization import difference_summary, registration_summary
 from .synthetic import DEFAULT_SEED, generate_synthetic_dataset
@@ -47,6 +48,16 @@ class SpherexValidationFieldRequest(BaseModel):
 
 class SpherexValidationRequest(BaseModel):
     fields: list[SpherexValidationFieldRequest] = Field(..., min_length=2, max_length=12)
+
+
+class SpherexEvidenceGraphRequest(BaseModel):
+    ra_deg: float = Field(..., ge=-360, le=360)
+    dec_deg: float = Field(..., ge=-90, le=90)
+    radius_deg: float = Field(0.001, gt=0, le=2)
+    collection: str = Field("spherex_qr2", pattern=r"^spherex_qr[23](?:_deep)?$")
+    bands: list[str] = Field(..., min_length=2, max_length=6)
+    cutout_size_deg: float = Field(0.03, ge=0.01, le=1)
+    max_results: int = Field(20, ge=2, le=200)
 
 app = FastAPI(
     title="PARALLAX Science Service",
@@ -136,6 +147,22 @@ def spherex_validate(request: SpherexValidationRequest) -> dict:
 
     fields = [SpherexValidationField(**field.model_dump()) for field in request.fields]
     return validate_spherex_fields(fields)
+
+
+@app.post("/archive/spherex/evidence-graph")
+def spherex_evidence_graph(request: SpherexEvidenceGraphRequest) -> dict:
+    """Build a human-review-ready evidence graph for one sky target."""
+
+    if any(not band.strip() for band in request.bands):
+        raise HTTPException(status_code=422, detail="bands must contain non-empty names")
+    return build_spherex_evidence_graph(
+        {"ra_deg": request.ra_deg, "dec_deg": request.dec_deg},
+        request.bands,
+        radius_deg=request.radius_deg,
+        collection=request.collection,
+        cutout_size_deg=request.cutout_size_deg,
+        max_results=request.max_results,
+    )
 
 
 @app.post("/process/register")

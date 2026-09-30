@@ -17,6 +17,7 @@ const secondaryNav = [
   { href: '/science', label: 'Science Methodology' },
   { href: '/validation', label: 'Validation Results' },
   { href: '/spherex', label: 'Live SPHEREx' },
+  { href: '/parallax-x', label: 'PARALLAX X' },
   { href: '/provenance', label: 'Data Provenance' },
   { href: '/architecture', label: 'Architecture' },
   { href: '/demo', label: 'Demo Investigation' },

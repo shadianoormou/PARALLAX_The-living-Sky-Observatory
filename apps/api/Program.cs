@@ -28,7 +28,8 @@ builder.Services.AddHttpClient<IScienceServiceClient, ScienceServiceClient>((ser
 {
     var baseUrl = serviceProvider.GetRequiredService<IConfiguration>()["ScienceService:BaseUrl"] ?? "http://localhost:8001/";
     client.BaseAddress = new Uri(baseUrl, UriKind.Absolute);
-    client.Timeout = TimeSpan.FromSeconds(60);
+    var timeoutSeconds = serviceProvider.GetRequiredService<IConfiguration>().GetValue("ScienceService:TimeoutSeconds", 300);
+    client.Timeout = TimeSpan.FromSeconds(Math.Clamp(timeoutSeconds, 30, 900));
 });
 builder.Services.AddScoped<DemoAnalysisService>();
 builder.Services.AddScoped<ConsensusService>();

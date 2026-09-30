@@ -138,6 +138,9 @@ public static class EndpointMappings
         app.MapPost("/api/archive/spherex/validate", async (SpherexValidationRequest body, IScienceServiceClient science, CancellationToken cancellationToken) =>
             Results.Ok(await science.ValidateSpherexAsync(body, cancellationToken)));
 
+        app.MapPost("/api/archive/spherex/evidence-graph", async (SpherexEvidenceGraphRequest body, IScienceServiceClient science, CancellationToken cancellationToken) =>
+            Results.Ok(await science.EvidenceGraphSpherexAsync(body, cancellationToken)));
+
         app.MapPost("/api/passport/modules/{moduleKey}", async (string moduleKey, HttpRequest request, PassportService passport, CancellationToken cancellationToken) =>
         {
             var result = await passport.CompleteModuleAsync(DemoUserKey(request), moduleKey, cancellationToken);

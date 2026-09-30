@@ -41,6 +41,15 @@ public sealed record SpherexValidationFieldRequest(
 public sealed record SpherexValidationRequest(
     [property: JsonPropertyName("fields")] IReadOnlyList<SpherexValidationFieldRequest> Fields);
 
+public sealed record SpherexEvidenceGraphRequest(
+    [property: JsonPropertyName("ra_deg")] double RaDeg,
+    [property: JsonPropertyName("dec_deg")] double DecDeg,
+    [property: JsonPropertyName("radius_deg")] double RadiusDeg = 0.001,
+    [property: JsonPropertyName("collection")] string Collection = "spherex_qr2",
+    [property: JsonPropertyName("bands")] IReadOnlyList<string>? Bands = null,
+    [property: JsonPropertyName("cutout_size_deg")] double CutoutSizeDeg = 0.03,
+    [property: JsonPropertyName("max_results")] int MaxResults = 20);
+
 public sealed class ScienceAnalysisResponse
 {
     [JsonPropertyName("dataset_label")] public string DatasetLabel { get; set; } = string.Empty;

@@ -70,6 +70,8 @@ Run the repeatable multi-field real-data check from the repository root:
 
 The same report is available through `POST /archive/spherex/validate` on the science service, `POST /api/archive/spherex/validate` on the API, and the **REAL ARCHIVE VALIDATION** panel at `/validation`. Each field records `READY TO COMPARE`, caution, blocked, or error status independently.
 
+PARALLAX X adds a same-target, multi-band evidence chain. `POST /archive/spherex/evidence-graph` (or `/api/archive/spherex/evidence-graph`) accepts two to six bands and returns per-band epochs, quality gates, candidates, null results, and a provenance graph. The browser workflow is `/parallax-x`. The API proxy allows up to five minutes for a multi-band archive request; configure `ScienceService:TimeoutSeconds` for a different deployment limit. Cross-band agreement is evidence context, not a discovery probability.
+
 The processing service accepts the deterministic demo request:
 
 ```bash

@@ -69,6 +69,7 @@ public sealed class FakeScienceServiceClient : IScienceServiceClient
     public Task<JsonElement> SearchSpherexAsync(SpherexArchiveRequest request, CancellationToken cancellationToken) => Task.FromResult(JsonSerializer.SerializeToElement(new { source = "NASA SPHEREx / IRSA", records = Array.Empty<object>() }));
     public Task<JsonElement> AnalyzeSpherexAsync(SpherexArchiveRequest request, CancellationToken cancellationToken) => Task.FromResult(JsonSerializer.SerializeToElement(new { source = "NASA SPHEREx / IRSA", analysis = new { comparison = new { status = "READY TO COMPARE" } } }));
     public Task<JsonElement> ValidateSpherexAsync(SpherexValidationRequest request, CancellationToken cancellationToken) => Task.FromResult(JsonSerializer.SerializeToElement(new { suite = "SPHEREx live multi-field validation", requested_fields = request.Fields.Count, ready_fields = request.Fields.Count }));
+    public Task<JsonElement> EvidenceGraphSpherexAsync(SpherexEvidenceGraphRequest request, CancellationToken cancellationToken) => Task.FromResult(JsonSerializer.SerializeToElement(new { suite = "PARALLAX X SPHEREx Evidence Graph", summary = new { bands_requested = request.Bands?.Count ?? 0, total_candidates = 0 } }));
 
     public Task<ScienceAnalysisResponse> AnalyzeAsync(ScienceProcessRequest request, CancellationToken cancellationToken)
     {
@@ -222,6 +223,18 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.OK, analysis.StatusCode);
         var analysisPayload = await analysis.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("READY TO COMPARE", analysisPayload.GetProperty("analysis").GetProperty("comparison").GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Spherex_evidence_graph_is_proxied()
+    {
+        using var client = factory.CreateClient();
+        var request = new SpherexEvidenceGraphRequest(127.69, -39.17, Bands: ["SPHEREx-D3", "SPHEREx-D4"]);
+        var response = await client.PostAsJsonAsync("/api/archive/spherex/evidence-graph", request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("PARALLAX X SPHEREx Evidence Graph", payload.GetProperty("suite").GetString());
+        Assert.Equal(2, payload.GetProperty("summary").GetProperty("bands_requested").GetInt32());
     }
 
     [Fact]

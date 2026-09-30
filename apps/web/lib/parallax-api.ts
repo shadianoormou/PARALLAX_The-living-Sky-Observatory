@@ -150,6 +150,48 @@ export type SpherexValidationReport = {
   limitations: string[];
 };
 
+export type SpherexEvidenceGraphRequest = {
+  ra_deg: number;
+  dec_deg: number;
+  radius_deg?: number;
+  collection?: string;
+  bands: string[];
+  cutout_size_deg?: number;
+  max_results?: number;
+};
+
+export type SpherexEvidenceBand = {
+  band: string;
+  status: string;
+  query: JsonObject;
+  epochs: string[];
+  candidate_count: number;
+  screened_count: number;
+  quality: JsonObject;
+  candidates: Array<JsonObject>;
+  screened_candidates: Array<JsonObject>;
+  elapsed_seconds: number;
+  error?: string;
+};
+
+export type SpherexEvidenceGraph = {
+  suite: string;
+  mode: string;
+  target: { ra_deg: number; dec_deg: number };
+  summary: {
+    bands_requested: number;
+    bands_ready: number;
+    bands_caution: number;
+    bands_blocked: number;
+    bands_error: number;
+    total_candidates: number;
+    bands_with_candidates: number;
+  };
+  bands: SpherexEvidenceBand[];
+  graph: { nodes: Array<JsonObject>; edges: Array<JsonObject> };
+  limitations: string[];
+};
+
 export type Achievement = {
   key: string;
   name: string;
@@ -299,6 +341,9 @@ export const parallaxApi = {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request),
   }),
   validateSpherex: (request: SpherexValidationRequest) => fetchJson<SpherexValidationReport>('/api/archive/spherex/validate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request),
+  }),
+  evidenceGraphSpherex: (request: SpherexEvidenceGraphRequest) => fetchJson<SpherexEvidenceGraph>('/api/archive/spherex/evidence-graph', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request),
   }),
 };
