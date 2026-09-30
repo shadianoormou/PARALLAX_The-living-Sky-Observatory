@@ -7,14 +7,15 @@ PARALLAX has two explicit data modes. The deterministic synthetic pipeline is a 
 1. Generate two seeded 128 × 128 tangent-plane images with a background, PSF-like stable sources, an injected moving source, a variable source, a narrow artifact, and a low-SNR source.
 2. Run the Comparison Guard against dimensions, coordinate frame, overlap, pixel scale, band compatibility, and available registration quality. It returns `READY TO COMPARE`, `COMPARE WITH CAUTION`, or `COMPARISON NOT RELIABLE` with reasons; a blocked pair cannot enter image processing.
 3. Validate that both inputs are finite 2D arrays with matching dimensions and required metadata.
-4. Estimate a translation with phase correlation on clipped, lightly smoothed images. Dynamic tails are clipped so one bright change or artifact cannot dominate the global shift.
-5. Apply the sub-pixel translation with cubic interpolation.
-6. Estimate a scalar photometric scale from high-signal pixels and calculate `Epoch B / scale - Epoch A`.
-7. Estimate background noise with MAD / 0.67448975. Candidate extraction uses a Gaussian PSF-like matched-filter proxy, a sigma threshold, connected components, sign pairing, and shape filtering.
-8. Pair nearby negative and positive lobes as `apparent_motion`; report their measured displacement. Unpaired positive PSF-like components are reported as `brightness_change` with local-sky-subtracted aperture fluxes.
-9. Compare the selected synthetic multi-band samples without assigning a physical class.
-10. Screen non-promoted residuals separately: elongated high-SNR components are labeled `likely_artifact`, while measured 3–5σ components are labeled `uncertain` and `needs_review`.
-11. Expose the measurements and quality context to human reviewers. A review label and optional confidence are stored as a separate user action; community agreement is not a scientific truth claim.
+4. Build a pixel quality mask from finite values, positive VARIANCE, and non-nominal FLAGS. Unusable archive pixels are replaced only for alignment and cannot become measured residuals.
+5. Estimate a translation with phase correlation on clipped, lightly smoothed images. Dynamic tails are clipped so one bright change or artifact cannot dominate the global shift.
+6. Apply the sub-pixel translation with cubic interpolation and carry the shifted quality mask into differencing.
+7. Estimate a scalar photometric scale from high-signal valid pixels and calculate `Epoch B / scale - Epoch A`.
+8. Estimate background noise with MAD / 0.67448975. Candidate extraction uses a Gaussian PSF-like matched-filter proxy, a sigma threshold, connected components, sign pairing, and shape filtering.
+9. Pair nearby negative and positive lobes as `apparent_motion`; report their measured displacement. Unpaired positive PSF-like components are reported as `brightness_change` with local-sky-subtracted aperture fluxes.
+10. Compare the selected synthetic multi-band samples without assigning a physical class.
+11. Screen non-promoted residuals separately: elongated high-SNR components are labeled `likely_artifact`, while measured 3–5σ components are labeled `uncertain` and `needs_review`.
+12. Expose the measurements and quality context to human reviewers. A review label and optional confidence are stored as a separate user action; community agreement is not a scientific truth claim.
 
 For an image (I), the robust noise estimate is:
 

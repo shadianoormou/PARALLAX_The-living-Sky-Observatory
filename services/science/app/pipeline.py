@@ -26,6 +26,7 @@ class RegistrationResult:
     aligned_b: np.ndarray
     shift_yx: tuple[float, float]
     quality: dict[str, float]
+    valid_mask: np.ndarray | None = None
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,7 @@ class DifferenceResult:
     noise_sigma: float
     stats: dict[str, float]
     registration: RegistrationResult
+    valid_mask: np.ndarray | None = None
 
 
 def assess_comparison_metadata(
@@ -147,25 +149,54 @@ def validate_observations(epoch_a: Observation, epoch_b: Observation) -> None:
         missing = sorted(required.difference(observation.metadata))
         if missing:
             raise ObservationValidationError(f"missing metadata: {', '.join(missing)}")
+        for label, quality_array in (("variance", observation.variance), ("flags", observation.flags)):
+            if quality_array is not None and quality_array.shape != observation.image.shape:
+                raise ObservationValidationError(f"{label} dimensions must match the observation image")
 
 
-def robust_sigma(image: np.ndarray) -> float:
-    median = float(np.median(image))
-    mad = float(np.median(np.abs(image - median)))
+def _quality_mask(observation: Observation) -> np.ndarray:
+    """Build a pixel-level mask from finite data, variance, and archive flags."""
+
+    mask = np.isfinite(observation.image)
+    if observation.variance is not None:
+        mask &= np.isfinite(observation.variance) & (observation.variance > 0)
+    if observation.flags is not None:
+        nominal_mask = int(observation.metadata.get("nominal_flag_mask", 1 << 21))
+        non_nominal = np.bitwise_and(observation.flags.astype(np.int64), ~np.int64(nominal_mask))
+        mask &= non_nominal == 0
+    return mask
+
+
+def _has_pixel_quality(observation: Observation) -> bool:
+    return observation.variance is not None or observation.flags is not None
+
+
+def robust_sigma(image: np.ndarray, valid_mask: np.ndarray | None = None) -> float:
+    values = image[valid_mask] if valid_mask is not None else image.reshape(-1)
+    values = values[np.isfinite(values)]
+    if values.size == 0:
+        return 1e-6
+    median = float(np.median(values))
+    mad = float(np.median(np.abs(values - median)))
     sigma = mad / 0.6744897501960817
-    return max(sigma, float(np.std(image)) * 0.1, 1e-6)
+    return max(sigma, float(np.std(values)) * 0.1, 1e-6)
 
 
 def register_observations(epoch_a: Observation, epoch_b: Observation) -> RegistrationResult:
     """Estimate and apply a translation using phase correlation."""
 
     validate_observations(epoch_a, epoch_b)
+    valid_a = _quality_mask(epoch_a)
+    valid_b = _quality_mask(epoch_b)
     # Clipping the high dynamic-range tails keeps the injected moving source and
-    # narrow artifact from dominating the global translation estimate.
-    reference_median = float(np.median(epoch_a.image))
-    moving_median = float(np.median(epoch_b.image))
-    reference_for_registration = ndimage.gaussian_filter(np.clip(epoch_a.image, reference_median, reference_median + 5.0), sigma=1.0)
-    moving_for_registration = ndimage.gaussian_filter(np.clip(epoch_b.image, moving_median, moving_median + 5.0), sigma=1.0)
+    # narrow artifact from dominating the global translation estimate. Unusable
+    # archive pixels are replaced only for alignment and remain masked later.
+    reference_median = float(np.median(epoch_a.image[valid_a])) if np.any(valid_a) else 0.0
+    moving_median = float(np.median(epoch_b.image[valid_b])) if np.any(valid_b) else 0.0
+    clean_a = np.where(valid_a, epoch_a.image, reference_median)
+    clean_b = np.where(valid_b, epoch_b.image, moving_median)
+    reference_for_registration = ndimage.gaussian_filter(np.clip(clean_a, reference_median, reference_median + 5.0), sigma=1.0)
+    moving_for_registration = ndimage.gaussian_filter(np.clip(clean_b, moving_median, moving_median + 5.0), sigma=1.0)
     shift, error, _ = phase_cross_correlation(
         reference_for_registration,
         moving_for_registration,
@@ -173,21 +204,30 @@ def register_observations(epoch_a: Observation, epoch_b: Observation) -> Registr
         normalization=None,
     )
     shift_yx = (float(shift[0]), float(shift[1]))
-    aligned_b = ndimage.shift(epoch_b.image, shift=shift_yx, order=3, mode="constant", cval=float(np.median(epoch_b.image)), prefilter=True)
+    aligned_b = ndimage.shift(clean_b, shift=shift_yx, order=3, mode="constant", cval=moving_median, prefilter=True)
+    aligned_b_mask = ndimage.shift(valid_b.astype(np.float32), shift=shift_yx, order=0, mode="constant", cval=0.0) > 0.5
+    valid_mask = valid_a & aligned_b_mask & np.isfinite(aligned_b)
     overlap = (1 - abs(shift_yx[0]) / epoch_a.image.shape[0]) * (1 - abs(shift_yx[1]) / epoch_a.image.shape[1])
     return RegistrationResult(
         aligned_b=aligned_b.astype(np.float32),
         shift_yx=shift_yx,
-        quality={"phase_correlation_error": float(error), "overlap_fraction": float(max(0.0, overlap))},
+        quality={
+            "phase_correlation_error": float(error),
+            "overlap_fraction": float(max(0.0, overlap)),
+            "valid_pixel_fraction": float(np.mean(valid_mask)),
+        },
+        valid_mask=valid_mask,
     )
 
 
-def photometric_normalize(reference: np.ndarray, aligned_b: np.ndarray) -> float:
+def photometric_normalize(reference: np.ndarray, aligned_b: np.ndarray, valid_mask: np.ndarray | None = None) -> float:
     """Estimate a scalar brightness ratio from high-signal finite pixels."""
 
-    ref_sigma = robust_sigma(reference)
+    ref_sigma = robust_sigma(reference, valid_mask)
     ref_floor = float(np.median(reference)) + 3.0 * ref_sigma
     candidate_mask = (reference > ref_floor) & (aligned_b > ref_floor)
+    if valid_mask is not None:
+        candidate_mask &= valid_mask
     ratios = aligned_b[candidate_mask] / np.maximum(reference[candidate_mask], 1e-6)
     ratios = ratios[np.isfinite(ratios)]
     if ratios.size < 8:
@@ -200,18 +240,24 @@ def difference_observations(epoch_a: Observation, epoch_b: Observation) -> Diffe
     if assessment["status"] == "COMPARISON NOT RELIABLE":
         raise ObservationValidationError(f"COMPARISON NOT RELIABLE: {assessment['reasons'][0]}")
     registration = register_observations(epoch_a, epoch_b)
-    scale = photometric_normalize(epoch_a.image, registration.aligned_b)
-    difference = registration.aligned_b / scale - epoch_a.image
-    noise_sigma = robust_sigma(difference)
+    valid_mask = registration.valid_mask if registration.valid_mask is not None else np.ones_like(epoch_a.image, dtype=bool)
+    reference = np.where(valid_mask, epoch_a.image, float(np.median(epoch_a.image)))
+    scale = photometric_normalize(reference, registration.aligned_b, valid_mask)
+    difference = registration.aligned_b / scale - reference
+    difference = np.where(valid_mask, difference, 0.0)
+    noise_mask = valid_mask if (_has_pixel_quality(epoch_a) or _has_pixel_quality(epoch_b)) else None
+    noise_sigma = robust_sigma(difference, noise_mask)
+    measured_difference = difference[valid_mask]
     stats = {
-        "minimum": float(np.min(difference)),
-        "maximum": float(np.max(difference)),
-        "median": float(np.median(difference)),
-        "mean": float(np.mean(difference)),
-        "rms": float(np.sqrt(np.mean(np.square(difference)))),
+        "minimum": float(np.min(measured_difference)) if measured_difference.size else 0.0,
+        "maximum": float(np.max(measured_difference)) if measured_difference.size else 0.0,
+        "median": float(np.median(measured_difference)) if measured_difference.size else 0.0,
+        "mean": float(np.mean(measured_difference)) if measured_difference.size else 0.0,
+        "rms": float(np.sqrt(np.mean(np.square(measured_difference)))) if measured_difference.size else 0.0,
         "noise_sigma": noise_sigma,
+        "valid_pixel_fraction": float(np.mean(valid_mask)),
     }
-    return DifferenceResult(registration.aligned_b, scale, difference.astype(np.float32), noise_sigma, stats, registration)
+    return DifferenceResult(registration.aligned_b, scale, difference.astype(np.float32), noise_sigma, stats, registration, valid_mask)
 
 
 def _component(image: np.ndarray, labels: np.ndarray, index: int, difference: np.ndarray, noise_sigma: float) -> dict[str, Any]:
@@ -241,11 +287,14 @@ def _component(image: np.ndarray, labels: np.ndarray, index: int, difference: np
     }
 
 
-def _aperture_sum(image: np.ndarray, x: float, y: float, radius: float = 3.0) -> float:
+def _aperture_sum(image: np.ndarray, x: float, y: float, radius: float = 3.0, valid_mask: np.ndarray | None = None) -> float:
     yy, xx = np.ogrid[: image.shape[0], : image.shape[1]]
     distance_squared = (xx - x) ** 2 + (yy - y) ** 2
     aperture = distance_squared <= radius**2
     annulus = (distance_squared > (radius + 2.0) ** 2) & (distance_squared <= (radius + 4.0) ** 2)
+    if valid_mask is not None:
+        aperture &= valid_mask
+        annulus &= valid_mask
     sky = float(np.median(image[annulus])) if np.any(annulus) else float(np.median(image))
     return float(np.sum(image[aperture] - sky))
 
@@ -261,10 +310,12 @@ def detect_candidates(
     result = difference or difference_observations(epoch_a, epoch_b)
     # Matched-filter-like smoothing improves sensitivity to PSF-shaped changes
     # while preserving a separate raw-difference noise metric for reporting.
+    valid_mask = result.valid_mask if result.valid_mask is not None else np.ones_like(result.difference, dtype=bool)
     detection_image = ndimage.gaussian_filter(result.difference, sigma=1.0)
-    detection_noise_sigma = robust_sigma(detection_image)
+    noise_mask = valid_mask if (_has_pixel_quality(epoch_a) or _has_pixel_quality(epoch_b)) else None
+    detection_noise_sigma = robust_sigma(detection_image, noise_mask)
     threshold = threshold_sigma * detection_noise_sigma
-    mask = np.abs(detection_image) >= threshold
+    mask = (np.abs(detection_image) >= threshold) & valid_mask
     labels, count = ndimage.label(mask, structure=np.ones((3, 3), dtype=np.uint8))
     components = [
         _component(detection_image, labels, index, detection_image, detection_noise_sigma)
@@ -336,8 +387,8 @@ def detect_candidates(
 
         if component["sign"] > 0:
             used.add(index)
-            flux_a = _aperture_sum(epoch_a.image, x, y)
-            flux_b = _aperture_sum(result.aligned_b, x, y) / result.normalized_scale
+            flux_a = _aperture_sum(epoch_a.image, x, y, valid_mask=valid_mask)
+            flux_b = _aperture_sum(result.aligned_b, x, y, valid_mask=valid_mask) / result.normalized_scale
             delta_flux = flux_b - flux_a
             candidates.append({
                 "candidate_id": f"change-{len(candidates) + 1:03d}",
@@ -375,11 +426,13 @@ def screen_candidates(
     """
 
     result = difference or difference_observations(epoch_a, epoch_b)
+    valid_mask = result.valid_mask if result.valid_mask is not None else np.ones_like(result.difference, dtype=bool)
     detection_image = ndimage.gaussian_filter(result.difference, sigma=1.0)
-    detection_noise_sigma = robust_sigma(detection_image)
+    noise_mask = valid_mask if (_has_pixel_quality(epoch_a) or _has_pixel_quality(epoch_b)) else None
+    detection_noise_sigma = robust_sigma(detection_image, noise_mask)
 
     def components_at(threshold_sigma: float) -> list[dict[str, Any]]:
-        mask = np.abs(detection_image) >= threshold_sigma * detection_noise_sigma
+        mask = (np.abs(detection_image) >= threshold_sigma * detection_noise_sigma) & valid_mask
         labels, count = ndimage.label(mask, structure=np.ones((3, 3), dtype=np.uint8))
         return [
             _component(detection_image, labels, index, detection_image, detection_noise_sigma)

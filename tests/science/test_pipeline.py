@@ -74,6 +74,31 @@ def test_comparison_guard_blocks_heavily_flagged_fields() -> None:
     assert any("flagged pixels" in reason for reason in assessment["blocking_issues"])
 
 
+def test_archive_quality_masks_are_carried_into_registration_and_detection() -> None:
+    dataset = generate_synthetic_dataset()
+    flags_a = np.zeros_like(dataset.epoch_a.image, dtype=np.int32)
+    flags_b = np.zeros_like(dataset.epoch_b.image, dtype=np.int32)
+    variance_a = np.ones_like(dataset.epoch_a.image, dtype=np.float32)
+    variance_b = np.ones_like(dataset.epoch_b.image, dtype=np.float32)
+    flags_a[:24, :] = 1
+    flags_b[:24, :] = 1
+    masked_a = replace(dataset.epoch_a, flags=flags_a, variance=variance_a)
+    masked_b = replace(dataset.epoch_b, flags=flags_b, variance=variance_b)
+
+    registration = register_observations(masked_a, masked_b)
+    analysis = analyze_observations(masked_a, masked_b)
+
+    assert registration.quality["valid_pixel_fraction"] < 0.9
+    assert analysis["registration"]["quality"]["valid_pixel_fraction"] < 0.9
+    points = [
+        point
+        for candidate in analysis["candidates"]
+        for key in ("position_xy", "position_a_xy", "position_b_xy")
+        if (point := candidate["measurement"].get(key)) is not None
+    ]
+    assert all(point[1] > 24 for point in points)
+
+
 def test_spectral_comparison_preserves_measurements_without_physical_labels() -> None:
     dataset = generate_synthetic_dataset()
     analysis = analyze_observations(dataset.epoch_a, dataset.epoch_b)

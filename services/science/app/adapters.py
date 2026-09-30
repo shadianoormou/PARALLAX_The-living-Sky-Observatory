@@ -271,6 +271,11 @@ class SpherexIrsaAdapter:
             non_nominal = np.bitwise_and(flags.astype(np.int64), ~np.int64(1 << 21))
             bad_fraction = float(np.count_nonzero(non_nominal)) / float(flags.size)
         variance_median = float(np.nanmedian(variance)) if variance is not None else None
+        valid_pixels = finite.copy()
+        if variance is not None:
+            valid_pixels &= np.isfinite(variance) & (variance > 0)
+        if flags is not None:
+            valid_pixels &= np.bitwise_and(flags.astype(np.int64), ~np.int64(1 << 21)) == 0
         metadata: dict[str, Any] = {
             "dataset_label": f"SPHEREx {self.collection.upper()} · IRSA ARCHIVE",
             "dataset_id": self.collection,
@@ -299,14 +304,16 @@ class SpherexIrsaAdapter:
             "image_unit": header.get("BUNIT", "unknown"),
             "invalid_pixel_count": invalid_count,
             "invalid_pixel_fraction": invalid_count / float(image.size),
+            "valid_pixel_fraction": float(np.mean(valid_pixels)),
             "flagged_pixel_fraction": flagged_fraction,
             "bad_pixel_fraction": bad_fraction,
+            "nominal_flag_mask": 1 << 21,
             "median_variance": variance_median,
             "quality_flags_present": flags is not None,
             "wcs": {key: header[key] for key in ("CTYPE1", "CTYPE2", "CRVAL1", "CRVAL2") if key in header},
             "provenance_status": "real SPHEREx archive cutout; source and retrieval metadata preserved",
         }
-        return Observation(image.astype(np.float32), metadata, {})
+        return Observation(image.astype(np.float32), metadata, {}, variance=variance, flags=flags)
 
     def _download(self, url: str) -> tuple[bytes, str, str]:
         cache_path = self._cache_path(url)

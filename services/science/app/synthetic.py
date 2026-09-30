@@ -21,6 +21,8 @@ class Observation:
     image: np.ndarray
     metadata: dict[str, Any]
     spectra: dict[str, np.ndarray]
+    variance: np.ndarray | None = None
+    flags: np.ndarray | None = None
 
 
 @dataclass(frozen=True)

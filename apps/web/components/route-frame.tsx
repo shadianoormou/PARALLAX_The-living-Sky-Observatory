@@ -4,7 +4,7 @@ export function RouteFrame({ children, marker }: { children: React.ReactNode; ma
       <div className="mx-auto max-w-[1440px]">
         <div className="mb-10 flex items-center justify-between border-b border-[var(--line)] pb-4">
           <span className="mono text-[10px] uppercase tracking-[.16em] text-[var(--quiet)]">PARALLAX / {marker ?? 'observatory'}</span>
-          <span className="mono text-[10px] uppercase tracking-[.16em] text-[var(--quiet)]">status: phase 7 / demo-ready</span>
+          <span className="mono text-[10px] uppercase tracking-[.16em] text-[var(--quiet)]">status: phase 8 / release candidate</span>
         </div>
         {children}
       </div>

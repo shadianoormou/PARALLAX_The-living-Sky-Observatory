@@ -86,7 +86,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       <footer className="border-t border-[var(--line)] bg-[var(--surface)]">
         <div className="mx-auto flex max-w-[1440px] flex-col gap-4 px-5 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12">
           <p className="mono text-[10px] uppercase tracking-[.12em] text-[var(--quiet)]">PARALLAX / living sky observatory</p>
-          <p className="max-w-md text-right text-xs leading-5 text-[var(--quiet)]">A careful interface for repeated observations. Demonstration measurements remain labeled and traceable.</p>
+          <p className="max-w-md text-right text-xs leading-5 text-[var(--quiet)]">A careful interface for repeated observations. Demonstration measurements remain labeled and traceable. AI-assisted code is disclosed in the project documentation.</p>
         </div>
       </footer>
     </div>

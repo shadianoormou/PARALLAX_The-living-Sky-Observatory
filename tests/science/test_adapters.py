@@ -60,6 +60,8 @@ def test_spherex_adapter_discovers_and_loads_provenance_backed_pair() -> None:
     assert pair.epoch_a.metadata["cutout_url"].endswith("center=127.00000000%2C-39.00000000&size=0.10000000")
     assert len(pair.epoch_a.metadata["checksum_sha256"]) == 64
     assert pair.epoch_a.metadata["bad_pixel_fraction"] == 1 / 16
+    assert pair.epoch_a.metadata["valid_pixel_fraction"] == 15 / 16
+    assert pair.epoch_a.flags is not None and pair.epoch_a.variance is not None
     assert adapter.provenance_manifest(pair)["query"]["collection"] == "spherex_qr2"
 
     client.close()

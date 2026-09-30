@@ -10,6 +10,8 @@ This is the Phase 8 release gate. It records what was verified locally and what 
 - [x] API tests cover candidate retrieval, persisted measurements, demo analysis, provenance epochs/source, classification confidence, vote-gated consensus, passport updates, and Swagger availability.
 - [x] The web contract test checks blink/split/difference, divider, spectral blink, classification, consensus, provenance, and the precomputed route.
 - [x] Precomputed `data/demo/` assets allow read-only exploration when API/science/SQL Server is unavailable.
+- [x] The real SPHEREx path carries FLAGS/VARIANCE quality masks into registration, differencing, and candidate extraction.
+- [x] Judge handoff, NASA data credits, and AI-assisted development disclosure are visible in the repository and web methodology route.
 
 ## Operations and security
 
@@ -36,7 +38,7 @@ pnpm build:web
 
 ## Known limitations
 
-- The scientific dataset is deterministic synthetic validation data; it is not archival astronomy.
+- The synthetic fixture remains a deterministic regression instrument; real SPHEREx analysis is bounded exploratory archive inspection, not a survey completeness/purity benchmark.
 - Full browser E2E automation is not installed; the web gate is a source contract test plus manual screenshot/rehearsal coverage.
 - Docker verification requires Docker Desktop and a host able to pull the .NET, Python, Node, and SQL Server images.
 - The local fallback cannot persist votes or consensus, by design.
