@@ -9,6 +9,7 @@ It is designed around one rule: **a candidate is not a discovery**.
 ## Live release
 
 - **Public observatory:** [parallax-living-sky-observatory.kitgiz-1946.chatgpt.site](https://parallax-living-sky-observatory.kitgiz-1946.chatgpt.site)
+- **Vercel frontend:** [parallax-the-living-sky-observatory.vercel.app](https://parallax-the-living-sky-observatory.vercel.app)
 - **Judge Brief:** `/parallax-x`
 - **Guided investigation:** `/demo`
 - **Evidence explorer:** `/explore`
