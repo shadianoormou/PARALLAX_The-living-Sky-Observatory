@@ -29,6 +29,15 @@ dotnet tool run dotnet-ef database update --project apps/api/Parallax.Api.csproj
 
 The migrations are in `apps/api/Migrations/`, including `AddClassificationConfidence`. The local API uses SQL Server from `ConnectionStrings:DefaultConnection`; tests replace it with an in-memory SQLite connection.
 
+For a persistent local run without Docker/SQL Server, use the SQLite development profile:
+
+```bash
+PARALLAX_DATABASE_PROVIDER=sqlite PARALLAX_APPLY_MIGRATIONS=true \
+  dotnet run --project apps/api/Parallax.Api.csproj
+```
+
+This creates `data/parallax-dev.db` and enables the same candidate, classification, consensus, passport, and community-metrics endpoints locally. Docker Compose continues to use SQL Server for the production-shaped stack.
+
 For a controlled startup migration, set `PARALLAX_APPLY_MIGRATIONS=true`. The API then runs `Database.MigrateAsync()` before listening. It is disabled by default in local development so migration ownership stays explicit; Compose enables it after the SQL Server health check passes.
 
 The safe recovery sequence is: stop the API, verify the database volume is present, run `dotnet tool run dotnet-ef database update ...`, restart the API, and inspect `/health/ready`. Never delete the volume as a first recovery step.
@@ -53,6 +62,14 @@ curl -X POST http://localhost:8001/archive/spherex/analyze \
 
 The same operation is available through the API at `/api/archive/spherex/analyze`; the browser workflow is `/spherex`. Real archive failures remain explicit and do not silently fall back to synthetic science.
 
+Run the repeatable multi-field real-data check from the repository root:
+
+```bash
+.venv/bin/python scripts/validate_spherex_fields.py
+```
+
+The same report is available through `POST /archive/spherex/validate` on the science service, `POST /api/archive/spherex/validate` on the API, and the **REAL ARCHIVE VALIDATION** panel at `/validation`. Each field records `READY TO COMPARE`, caution, blocked, or error status independently.
+
 The processing service accepts the deterministic demo request:
 
 ```bash
@@ -76,6 +93,8 @@ curl http://localhost:5080/swagger
 ```
 
 Classification submission uses `POST /api/classifications` with `{ "candidate_id": "...", "label": "uncertain", "confidence": "LOW", "notes": "..." }` and an optional `X-Demo-User` header. Valid review labels are `moving_source`, `brightness_change`, `imaging_artifact`, and `uncertain`; confidence is optional and may be `LOW`, `MEDIUM`, or `HIGH`. Consensus remains forbidden until that user has submitted a vote for the candidate. `GET /api/passport` returns derived participation metrics and `POST /api/passport/modules/{moduleKey}` records a learning module.
+
+`GET /api/community/metrics` returns privacy-preserving aggregate adoption evidence: persisted review count, unique reviewer count, candidates reviewed, candidates with consensus, winning agreement, and label counts. The Citizen Science page displays these totals and clearly reports when the database is unavailable.
 
 ## SQL Server
 

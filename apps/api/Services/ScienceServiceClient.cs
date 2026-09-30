@@ -10,6 +10,7 @@ public interface IScienceServiceClient
     Task<JsonElement> RunValidationAsync(CancellationToken cancellationToken);
     Task<JsonElement> SearchSpherexAsync(SpherexArchiveRequest request, CancellationToken cancellationToken);
     Task<JsonElement> AnalyzeSpherexAsync(SpherexArchiveRequest request, CancellationToken cancellationToken);
+    Task<JsonElement> ValidateSpherexAsync(SpherexValidationRequest request, CancellationToken cancellationToken);
 }
 
 public sealed class ScienceServiceClient(HttpClient httpClient, ILogger<ScienceServiceClient> logger) : IScienceServiceClient
@@ -47,6 +48,9 @@ public sealed class ScienceServiceClient(HttpClient httpClient, ILogger<ScienceS
 
     public Task<JsonElement> AnalyzeSpherexAsync(SpherexArchiveRequest request, CancellationToken cancellationToken) =>
         PostJsonAsync("archive/spherex/analyze", request, "SPHEREx archive analysis", cancellationToken);
+
+    public Task<JsonElement> ValidateSpherexAsync(SpherexValidationRequest request, CancellationToken cancellationToken) =>
+        PostJsonAsync("archive/spherex/validate", request, "SPHEREx multi-field validation", cancellationToken);
 
     private async Task<JsonElement> PostJsonAsync<T>(string path, T request, string operation, CancellationToken cancellationToken)
     {

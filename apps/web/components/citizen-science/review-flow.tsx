@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { CandidateListItem, CandidateRecord, Consensus, ParallaxApiError, parallaxApi } from '../../lib/parallax-api';
+import { CandidateListItem, CandidateRecord, CommunityMetrics, Consensus, ParallaxApiError, parallaxApi } from '../../lib/parallax-api';
 
 const choices = [
   ['moving_source', 'MOVING SOURCE', 'A position change between observations.'],
@@ -24,6 +24,7 @@ export function CitizenScienceReview() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState<CommunityMetrics | null>(null);
 
   const candidate = candidates[index] ?? null;
   const orderedCandidates = useMemo(() => [...candidates].sort((a, b) => Number(b.status === 'needs_review') - Number(a.status === 'needs_review')), [candidates]);
@@ -38,6 +39,7 @@ export function CitizenScienceReview() {
         setError(reason instanceof Error ? reason.message : 'Candidates could not be loaded.');
         setLoading(false);
       });
+    void parallaxApi.getCommunityMetrics().then(setMetrics).catch(() => setMetrics(null));
   }, []);
 
   useEffect(() => {
@@ -79,7 +81,7 @@ export function CitizenScienceReview() {
 
   const totalVotes = consensus?.[0]?.totalVotes ?? 0;
   return (
-    <div className="grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
+    <div className="space-y-5"><CommunityMetricsPanel metrics={metrics} /><div className="grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
       <div className="panel p-6 sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--line)] pb-6">
           <div><p className="eyebrow">Candidate {index + 1} / {candidates.length}</p><h2 className="mt-3 text-2xl text-[var(--ink)]">WHAT DO YOU THINK THIS IS?</h2></div>
@@ -108,6 +110,14 @@ export function CitizenScienceReview() {
         {consensus ? <div className="panel p-6 sm:p-8"><p className="eyebrow">Community opinion</p><p className="mt-3 text-sm leading-6 text-[var(--muted)]">{totalVotes} reviewer{totalVotes === 1 ? '' : 's'} so far. This is community opinion, not scientific truth.</p><div className="mt-6 space-y-4">{consensus.map((item) => <div key={item.classificationLabel}><div className="mb-2 flex justify-between gap-4 text-xs"><span className="text-[var(--ink)]">{item.classificationLabel.replaceAll('_', ' ')}</span><span className="mono text-[var(--cyan)]">{Math.round(item.agreementFraction * 100)}%</span></div><div className="h-2 bg-[var(--surface-2)]"><div className="h-full bg-[var(--cyan)]" style={{ width: `${item.agreementFraction * 100}%` }} /></div></div>)}</div></div> : <div className="panel p-6 sm:p-8"><p className="eyebrow">Consensus is gated</p><p className="mt-4 text-sm leading-7 text-[var(--muted)]">Submit your own classification before seeing how other reviewers responded.</p></div>}
         <div className="panel p-6 sm:p-8"><p className="eyebrow">Review desk</p><p className="mt-4 text-sm leading-7 text-[var(--muted)]">Your review is saved against this candidate. Submitting again updates your existing vote rather than creating a duplicate.</p><button type="button" onClick={nextCandidate} className="mt-6 border border-[var(--line-strong)] px-4 py-3 text-xs uppercase tracking-[.14em] text-[var(--ink)]">Next candidate →</button><Link className="ml-4 text-xs uppercase tracking-[.14em] text-[var(--cyan)]" href="/passport">View passport</Link></div>
       </div>
-    </div>
+    </div></div>
   );
+}
+
+function CommunityMetricsPanel({ metrics }: { metrics: CommunityMetrics | null }) {
+  return <section className="panel p-5 sm:p-6"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="eyebrow">Measured participation</p><h2 className="mt-3 text-xl text-[var(--ink)]">A transparent review desk, not a vanity counter.</h2><p className="mt-2 text-sm leading-6 text-[var(--muted)]">These totals come from persisted classifications in the database. No activity is simulated.</p></div><span className="mono border border-[var(--cyan)]/30 px-3 py-2 text-[10px] uppercase tracking-[.12em] text-[var(--cyan)]">LIVE METRICS</span></div>{metrics ? <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><Metric label="Reviews" value={metrics.totalReviews} /><Metric label="Reviewers" value={metrics.uniqueReviewers} /><Metric label="Candidates" value={metrics.candidatesReviewed} /><Metric label="With consensus" value={metrics.candidatesWithConsensus} /><Metric label="Winning agreement" value={`${Math.round(metrics.averageWinningAgreement * 100)}%`} /></div> : <p className="mt-5 border border-[var(--line)] bg-[var(--surface-2)] p-4 text-xs leading-6 text-[var(--quiet)]">Metrics become available when the SQL-backed API is connected.</p>}</section>;
+}
+
+function Metric({ label, value }: { label: string; value: number | string }) {
+  return <div className="bg-[var(--surface-2)] p-4"><p className="mono text-[9px] uppercase tracking-[.1em] text-[var(--quiet)]">{label}</p><p className="mt-2 text-2xl text-[var(--cyan)]">{value}</p></div>;
 }

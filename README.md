@@ -53,6 +53,12 @@ python3 -m uvicorn app.main:app --app-dir services/science --reload --port 8001
 
 The observatory is at http://localhost:3000/explore, the API health endpoint is http://localhost:5080/health, and the science health endpoint is http://localhost:8001/health.
 
+If Docker/SQL Server is unavailable, start the API with the persistent SQLite development profile:
+
+```bash
+PARALLAX_DATABASE_PROVIDER=sqlite PARALLAX_APPLY_MIGRATIONS=true dotnet run --project apps/api/Parallax.Api.csproj
+```
+
 To start SQL Server locally:
 
 ```bash
@@ -80,7 +86,7 @@ Open http://localhost:3000. Stop with `Ctrl-C`; remove only the local database v
 
 If Docker is unavailable, `/explore` and `/demo` fall back to the checked-in, read-only precomputed artifact in `data/demo/`. That fallback is clearly labeled and cannot pretend to persist classifications or community consensus.
 
-The API Swagger UI is at http://localhost:5080/swagger. Open `/explore` and choose **Load demonstration field**; the API calls FastAPI, stores the returned metadata, measurements, spectra, and screened review items, and exposes them through the candidate endpoints. `/candidates` is the Sky Mysteries queue and `/candidates/{id}` is the evidence-first investigation route. `/citizen-science` is the vote-gated review flow, `/passport` reads persisted participation metrics, and `/provenance` exposes the source-to-processing ledger.
+The API Swagger UI is at http://localhost:5080/swagger. Open `/explore` and choose **Load demonstration field**; the API calls FastAPI, stores the returned metadata, measurements, spectra, and screened review items, and exposes them through the candidate endpoints. `/candidates` is the Sky Mysteries queue and `/candidates/{id}` is the evidence-first investigation route. `/citizen-science` is the vote-gated review flow with persisted adoption metrics, `/passport` reads persisted participation metrics, and `/provenance` exposes the source-to-processing ledger.
 
 ## Why this challenge matters
 

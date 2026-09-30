@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from .adapters import ArchiveAdapterError, SpherexIrsaAdapter, image_preview
+from .archive_validation import SpherexValidationField, validate_spherex_fields
 from .pipeline import ObservationValidationError, analyze_observations, assess_comparison_metadata, detect_candidates, difference_observations, register_observations, run_validation_suite
 from .serialization import difference_summary, registration_summary
 from .synthetic import DEFAULT_SEED, generate_synthetic_dataset
@@ -31,6 +32,21 @@ class SpherexArchiveRequest(BaseModel):
     band: str | None = Field(default=None, min_length=1, max_length=40)
     cutout_size_deg: float = Field(0.1, ge=0.01, le=1)
     max_results: int = Field(50, ge=2, le=200)
+
+
+class SpherexValidationFieldRequest(BaseModel):
+    label: str = Field(..., min_length=1, max_length=60)
+    ra_deg: float = Field(..., ge=-360, le=360)
+    dec_deg: float = Field(..., ge=-90, le=90)
+    radius_deg: float = Field(0.001, gt=0, le=2)
+    collection: str = Field("spherex_qr2", pattern=r"^spherex_qr[23](?:_deep)?$")
+    band: str | None = Field(default="SPHEREx-D3", min_length=1, max_length=40)
+    cutout_size_deg: float = Field(0.03, ge=0.01, le=1)
+    max_results: int = Field(20, ge=2, le=200)
+
+
+class SpherexValidationRequest(BaseModel):
+    fields: list[SpherexValidationFieldRequest] = Field(..., min_length=2, max_length=12)
 
 app = FastAPI(
     title="PARALLAX Science Service",
@@ -112,6 +128,14 @@ def spherex_analyze(request: SpherexArchiveRequest) -> dict:
         },
         "analysis": analysis,
     }
+
+
+@app.post("/archive/spherex/validate")
+def spherex_validate(request: SpherexValidationRequest) -> dict:
+    """Run the real-data quality workflow independently across multiple fields."""
+
+    fields = [SpherexValidationField(**field.model_dump()) for field in request.fields]
+    return validate_spherex_fields(fields)
 
 
 @app.post("/process/register")

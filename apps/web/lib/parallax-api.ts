@@ -114,6 +114,42 @@ export type Passport = {
   achievements: Achievement[];
 };
 
+export type CommunityMetrics = {
+  totalReviews: number;
+  uniqueReviewers: number;
+  candidatesReviewed: number;
+  candidatesWithConsensus: number;
+  averageWinningAgreement: number;
+  labels: Array<{ label: string; count: number }>;
+  firstReviewAtUtc: string | null;
+  lastReviewAtUtc: string | null;
+};
+
+export type SpherexValidationRequest = {
+  fields: Array<{
+    label: string;
+    ra_deg: number;
+    dec_deg: number;
+    radius_deg?: number;
+    collection?: string;
+    band?: string;
+    cutout_size_deg?: number;
+    max_results?: number;
+  }>;
+};
+
+export type SpherexValidationReport = {
+  suite: string;
+  mode: string;
+  requested_fields: number;
+  ready_fields: number;
+  caution_fields: number;
+  blocked_fields: number;
+  error_fields: number;
+  results: Array<{ label: string; status: string; epochs: string[]; candidate_count: number; screened_count: number; quality: JsonObject; error?: string }>;
+  limitations: string[];
+};
+
 export type Achievement = {
   key: string;
   name: string;
@@ -253,12 +289,16 @@ export const parallaxApi = {
   }),
   getConsensus: (id: string) => fetchJson<Consensus[]>(`/api/candidates/${id}/consensus`),
   getPassport: () => fetchJson<Passport>('/api/passport'),
+  getCommunityMetrics: () => fetchJson<CommunityMetrics>('/api/community/metrics'),
   completeLearningModule: (moduleKey: string) => fetchJson<Passport>(`/api/passport/modules/${moduleKey}`, { method: 'POST' }),
   getValidation: () => fetchJson<ValidationReport>('/api/validation'),
   searchSpherex: (request: SpherexArchiveRequest) => fetchJson<SpherexArchiveSearch>('/api/archive/spherex/search', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request),
   }),
   analyzeSpherex: (request: SpherexArchiveRequest) => fetchJson<SpherexArchiveAnalysis>('/api/archive/spherex/analyze', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request),
+  }),
+  validateSpherex: (request: SpherexValidationRequest) => fetchJson<SpherexValidationReport>('/api/archive/spherex/validate', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request),
   }),
 };

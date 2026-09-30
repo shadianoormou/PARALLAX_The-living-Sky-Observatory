@@ -28,6 +28,19 @@ public sealed record SpherexArchiveRequest(
     [property: JsonPropertyName("cutout_size_deg")] double CutoutSizeDeg = 0.1,
     [property: JsonPropertyName("max_results")] int MaxResults = 50);
 
+public sealed record SpherexValidationFieldRequest(
+    [property: JsonPropertyName("label")] string Label,
+    [property: JsonPropertyName("ra_deg")] double RaDeg,
+    [property: JsonPropertyName("dec_deg")] double DecDeg,
+    [property: JsonPropertyName("radius_deg")] double RadiusDeg = 0.001,
+    [property: JsonPropertyName("collection")] string Collection = "spherex_qr2",
+    [property: JsonPropertyName("band")] string? Band = "SPHEREx-D3",
+    [property: JsonPropertyName("cutout_size_deg")] double CutoutSizeDeg = 0.03,
+    [property: JsonPropertyName("max_results")] int MaxResults = 20);
+
+public sealed record SpherexValidationRequest(
+    [property: JsonPropertyName("fields")] IReadOnlyList<SpherexValidationFieldRequest> Fields);
+
 public sealed class ScienceAnalysisResponse
 {
     [JsonPropertyName("dataset_label")] public string DatasetLabel { get; set; } = string.Empty;
@@ -113,3 +126,15 @@ public sealed record PassportResponse(
     IReadOnlyList<AchievementResponse> Achievements);
 
 public sealed record AchievementResponse(string Key, string Name, string Description, DateTime EarnedAtUtc);
+
+public sealed record CommunityLabelCount(string Label, int Count);
+
+public sealed record CommunityMetricsResponse(
+    int TotalReviews,
+    int UniqueReviewers,
+    int CandidatesReviewed,
+    int CandidatesWithConsensus,
+    double AverageWinningAgreement,
+    IReadOnlyList<CommunityLabelCount> Labels,
+    DateTime? FirstReviewAtUtc,
+    DateTime? LastReviewAtUtc);

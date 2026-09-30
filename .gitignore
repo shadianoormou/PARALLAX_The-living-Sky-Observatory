@@ -13,6 +13,9 @@ __pycache__/
 .venv/
 *.pyc
 *.tsbuildinfo
+*.db
+*.db-shm
+*.db-wal
 .DS_Store
 *.user
 *.suo

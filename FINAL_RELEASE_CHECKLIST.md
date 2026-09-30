@@ -12,6 +12,9 @@ This is the Phase 8 release gate. It records what was verified locally and what 
 - [x] Precomputed `data/demo/` assets allow read-only exploration when API/science/SQL Server is unavailable.
 - [x] The real SPHEREx path carries FLAGS/VARIANCE quality masks into registration, differencing, and candidate extraction.
 - [x] Judge handoff, NASA data credits, and AI-assisted development disclosure are visible in the repository and web methodology route.
+- [x] A SQLite local persistence profile enables the full candidate → classification → consensus → passport flow when Docker SQL Server is unavailable; Compose remains SQL Server-backed.
+- [x] A repeatable three-field SPHEREx validation report records independent ready/caution/blocked/error outcomes without fabricating archive results.
+- [x] Privacy-preserving community adoption metrics are persisted and displayed from real classification rows.
 
 ## Operations and security
 

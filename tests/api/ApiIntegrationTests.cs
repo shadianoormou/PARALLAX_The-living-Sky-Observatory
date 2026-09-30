@@ -68,6 +68,7 @@ public sealed class FakeScienceServiceClient : IScienceServiceClient
     public Task<JsonElement> RunValidationAsync(CancellationToken cancellationToken) => Task.FromResult(JsonSerializer.SerializeToElement(new { summary = new { passed = 5, failed = 0, total = 5 } }));
     public Task<JsonElement> SearchSpherexAsync(SpherexArchiveRequest request, CancellationToken cancellationToken) => Task.FromResult(JsonSerializer.SerializeToElement(new { source = "NASA SPHEREx / IRSA", records = Array.Empty<object>() }));
     public Task<JsonElement> AnalyzeSpherexAsync(SpherexArchiveRequest request, CancellationToken cancellationToken) => Task.FromResult(JsonSerializer.SerializeToElement(new { source = "NASA SPHEREx / IRSA", analysis = new { comparison = new { status = "READY TO COMPARE" } } }));
+    public Task<JsonElement> ValidateSpherexAsync(SpherexValidationRequest request, CancellationToken cancellationToken) => Task.FromResult(JsonSerializer.SerializeToElement(new { suite = "SPHEREx live multi-field validation", requested_fields = request.Fields.Count, ready_fields = request.Fields.Count }));
 
     public Task<ScienceAnalysisResponse> AnalyzeAsync(ScienceProcessRequest request, CancellationToken cancellationToken)
     {
@@ -113,6 +114,19 @@ public class ApiIntegrationTests : IClassFixture<ApiFactory>
         Assert.Equal("seed-source", provenance!.SourceIdentifier);
         Assert.Equal("A", provenance.EpochA.GetProperty("epoch").GetString());
         Assert.Equal("B", provenance.EpochB.GetProperty("epoch").GetString());
+    }
+
+    [Fact]
+    public async Task Spherex_multi_field_validation_is_proxied()
+    {
+        using var client = factory.CreateClient();
+        var request = new SpherexValidationRequest([
+            new SpherexValidationFieldRequest("field-a", 127.69, -39.17),
+            new SpherexValidationFieldRequest("field-b", 150.11, 2.20)]);
+        var response = await client.PostAsJsonAsync("/api/archive/spherex/validate", request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(2, payload.GetProperty("requested_fields").GetInt32());
     }
 
     [Fact]

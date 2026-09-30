@@ -7,7 +7,8 @@ import httpx
 import numpy as np
 from astropy.io import fits
 
-from services.science.app.adapters import SpherexIrsaAdapter
+from services.science.app.adapters import ArchiveAdapterError, SpherexIrsaAdapter
+from services.science.app.archive_validation import SpherexValidationField, validate_spherex_fields
 
 
 def _fits_bytes() -> bytes:
@@ -89,3 +90,17 @@ def test_nominal_spherex_source_mask_is_not_treated_as_bad_pixel() -> None:
     assert image.shape == (4, 4)
     assert flags is not None and variance is not None
     assert np.count_nonzero(np.bitwise_and(flags.astype(np.int64), ~np.int64(1 << 21))) == 0
+
+
+def test_multi_field_validation_preserves_archive_failures_without_fabricating_results() -> None:
+    def failing_adapter(**_: object):
+        raise ArchiveAdapterError("archive unavailable")
+
+    report = validate_spherex_fields([
+        SpherexValidationField("field-a", 1.0, 2.0),
+        SpherexValidationField("field-b", 3.0, 4.0),
+    ], adapter_factory=failing_adapter)
+
+    assert report["requested_fields"] == 2
+    assert report["error_fields"] == 2
+    assert all(item["status"] == "ERROR" for item in report["results"])

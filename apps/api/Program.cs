@@ -12,7 +12,18 @@ var corsOrigins = builder.Configuration["PARALLAX_CORS_ORIGINS"]?
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy.WithOrigins(corsOrigins).AllowAnyHeader().AllowAnyMethod()));
-builder.Services.AddDbContext<ParallaxDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+var databaseProvider = builder.Configuration["PARALLAX_DATABASE_PROVIDER"]?.Trim().ToLowerInvariant() ?? "sqlserver";
+builder.Services.AddDbContext<ParallaxDbContext>(options =>
+{
+    if (databaseProvider == "sqlite")
+    {
+        options.UseSqlite(builder.Configuration.GetConnectionString("Sqlite") ?? "Data Source=data/parallax-dev.db");
+    }
+    else
+    {
+        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+    }
+});
 builder.Services.AddHttpClient<IScienceServiceClient, ScienceServiceClient>((serviceProvider, client) =>
 {
     var baseUrl = serviceProvider.GetRequiredService<IConfiguration>()["ScienceService:BaseUrl"] ?? "http://localhost:8001/";
@@ -36,7 +47,8 @@ if (builder.Configuration.GetValue<bool>("PARALLAX_APPLY_MIGRATIONS"))
 {
     await using var scope = app.Services.CreateAsyncScope();
     var db = scope.ServiceProvider.GetRequiredService<ParallaxDbContext>();
-    await db.Database.MigrateAsync();
+    if (databaseProvider == "sqlite") await db.Database.EnsureCreatedAsync();
+    else await db.Database.MigrateAsync();
 }
 
 app.MapGet("/health", () => Results.Ok(new { service = "parallax-api", status = "ok", phase = "persistence-and-integration" }));

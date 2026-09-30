@@ -101,6 +101,31 @@ public static class EndpointMappings
         app.MapGet("/api/passport", async (HttpRequest request, PassportService passport, CancellationToken cancellationToken) =>
             Results.Ok(await passport.GetAsync(DemoUserKey(request), cancellationToken)));
 
+        app.MapGet("/api/community/metrics", async (ParallaxDbContext db, CancellationToken cancellationToken) =>
+        {
+            var classifications = await db.Classifications.AsNoTracking().ToListAsync(cancellationToken);
+            var consensus = await db.ClassificationConsensuses.AsNoTracking().ToListAsync(cancellationToken);
+            var winningAgreement = consensus
+                .GroupBy(item => item.CandidateId)
+                .Select(group => group.Max(item => item.AgreementFraction))
+                .ToArray();
+            var labels = classifications
+                .GroupBy(item => item.Label, StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(group => group.Count())
+                .ThenBy(group => group.Key)
+                .Select(group => new CommunityLabelCount(group.Key, group.Count()))
+                .ToArray();
+            return Results.Ok(new CommunityMetricsResponse(
+                classifications.Count,
+                classifications.Select(item => item.UserProfileId).Distinct().Count(),
+                classifications.Select(item => item.CandidateId).Distinct().Count(),
+                winningAgreement.Length,
+                winningAgreement.Length == 0 ? 0 : winningAgreement.Average(),
+                labels,
+                classifications.Count == 0 ? null : classifications.Min(item => item.CreatedAtUtc),
+                classifications.Count == 0 ? null : classifications.Max(item => item.CreatedAtUtc)));
+        });
+
         app.MapGet("/api/validation", async (IScienceServiceClient science, CancellationToken cancellationToken) =>
             Results.Ok(await science.RunValidationAsync(cancellationToken)));
 
@@ -109,6 +134,9 @@ public static class EndpointMappings
 
         app.MapPost("/api/archive/spherex/analyze", async (SpherexArchiveRequest body, IScienceServiceClient science, CancellationToken cancellationToken) =>
             Results.Ok(await science.AnalyzeSpherexAsync(body, cancellationToken)));
+
+        app.MapPost("/api/archive/spherex/validate", async (SpherexValidationRequest body, IScienceServiceClient science, CancellationToken cancellationToken) =>
+            Results.Ok(await science.ValidateSpherexAsync(body, cancellationToken)));
 
         app.MapPost("/api/passport/modules/{moduleKey}", async (string moduleKey, HttpRequest request, PassportService passport, CancellationToken cancellationToken) =>
         {
