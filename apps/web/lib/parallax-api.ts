@@ -186,8 +186,15 @@ export type SpherexEvidenceGraph = {
     bands_error: number;
     total_candidates: number;
     bands_with_candidates: number;
+    consistency_status: string;
+    matched_candidate_groups: number;
   };
   bands: SpherexEvidenceBand[];
+  cross_band_consistency: {
+    status: string;
+    matched_groups: Array<{ group_id: string; bands: string[]; candidate_ids: string[]; position_normalized: number[] }>;
+    method: string;
+  };
   graph: { nodes: Array<JsonObject>; edges: Array<JsonObject> };
   limitations: string[];
 };

@@ -9,12 +9,13 @@ This is the short, honest route a judge can use without reading the repository.
 3. Open `/citizen-science`, submit a label with confidence, and inspect the vote-gated consensus behavior.
 4. Open `/provenance` to follow candidate → processing run → source → epochs → Comparison Guard.
 5. Open `/spherex` and use the prefilled coordinate to query two public SPHEREx epochs through IRSA. The real-data path displays archive metadata, quality coverage, bounded FITS previews, measurements, and provenance.
-6. Open `/parallax-x`, select at least two bands, and build the same-target evidence graph. Review which bands are ready, blocked, errored, or null results before interpreting a candidate.
+6. Open `/parallax-x` and click **Run judge brief** with the prefilled target. Review which bands are ready, blocked, errored, or null results, then inspect the explicit cross-band consistency status before interpreting a candidate.
 7. Open `/validation` to see the five deterministic regression cases and their measured errors.
 
 ## What is scientifically claimed
 
 - Real SPHEREx results are exploratory residual measurements, not a Planet X or NASA discovery claim.
+- The strongest positioning is Best Use of Science / Best Use of Data: the project demonstrates a reproducible evidence workflow, not a claim of survey completeness or adoption at scale.
 - Synthetic fixtures are regression instruments, not archive observations or survey-performance estimates.
 - FLAGS and VARIANCE are applied before real-data registration and candidate extraction.
 - A candidate interpretation is provisional; human review and independent verification remain separate.

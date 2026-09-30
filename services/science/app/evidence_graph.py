@@ -34,6 +34,58 @@ def _edge(source: str, target: str, relation: str, **extra: Any) -> dict[str, An
     return {"from": source, "to": target, "relation": relation, **extra}
 
 
+def _candidate_anchor(candidate: dict[str, Any], shape: tuple[int, int]) -> tuple[float, float] | None:
+    """Return a normalized cutout position when the detector measured one."""
+
+    measurement = candidate.get("measurement", {})
+    position = measurement.get("position_xy")
+    if position is None and measurement.get("position_a_xy") and measurement.get("position_b_xy"):
+        first = measurement["position_a_xy"]
+        second = measurement["position_b_xy"]
+        position = [(float(first[0]) + float(second[0])) / 2, (float(first[1]) + float(second[1])) / 2]
+    if not isinstance(position, list) or len(position) != 2 or not all(isinstance(value, (int, float)) for value in position):
+        return None
+    height, width = shape
+    if width <= 0 or height <= 0:
+        return None
+    return (float(position[0]) / width, float(position[1]) / height)
+
+
+def _cross_band_consistency(results: list[dict[str, Any]]) -> dict[str, Any]:
+    """Associate measured residuals by normalized cutout position, cautiously."""
+
+    anchors = [anchor for result in results for anchor in result.get("_anchors", [])]
+    if not anchors:
+        return {
+            "status": "NO PROMOTED CANDIDATES",
+            "matched_groups": [],
+            "method": "No promoted residuals were available for a cross-band position check.",
+        }
+    groups: list[dict[str, Any]] = []
+    for anchor in anchors:
+        matching = next((group for group in groups if anchor["band"] not in group["band_set"] and ((group["position"][0] - anchor["position"][0]) ** 2 + (group["position"][1] - anchor["position"][1]) ** 2) ** 0.5 <= 0.08), None)
+        if matching is None:
+            groups.append({"band_set": {anchor["band"]}, "position": anchor["position"], "candidates": [anchor]})
+        elif anchor["band"] not in matching["band_set"]:
+            matching["band_set"].add(anchor["band"])
+            matching["candidates"].append(anchor)
+    matched_groups = [
+        {
+            "group_id": f"cross-band-{index}",
+            "bands": sorted(group["band_set"]),
+            "candidate_ids": [item["candidate_id"] for item in group["candidates"]],
+            "position_normalized": [round(sum(item["position"][0] for item in group["candidates"]) / len(group["candidates"]), 4), round(sum(item["position"][1] for item in group["candidates"]) / len(group["candidates"]), 4)],
+        }
+        for index, group in enumerate(groups, start=1)
+        if len(group["band_set"]) >= 2
+    ]
+    return {
+        "status": "MULTI-BAND CONSISTENT" if matched_groups else "SINGLE-BAND ONLY",
+        "matched_groups": matched_groups,
+        "method": "Exploratory normalized cutout-position association within 8% of the cutout; not a WCS-confirmed source match.",
+    }
+
+
 def build_spherex_evidence_graph(
     target: dict[str, float],
     bands: list[str],
@@ -78,6 +130,7 @@ def build_spherex_evidence_graph(
             epochs = [record.observation_id for record in pair.records]
             candidates = analysis["candidates"]
             screened = analysis["screened_candidates"]
+            shape = tuple(pair.epoch_a.image.shape)
             quality = {
                 "valid_pixel_fraction": [
                     pair.epoch_a.metadata.get("valid_pixel_fraction"),
@@ -100,6 +153,11 @@ def build_spherex_evidence_graph(
                 "quality": quality,
                 "candidates": candidates,
                 "screened_candidates": screened,
+                "_anchors": [
+                    {"band": band, "candidate_id": candidate.get("candidate_id", "candidate"), "position": anchor}
+                    for candidate in candidates
+                    if (anchor := _candidate_anchor(candidate, shape)) is not None
+                ],
                 "elapsed_seconds": round(perf_counter() - started, 3),
             }
             band_node["status"] = status
@@ -132,6 +190,7 @@ def build_spherex_evidence_graph(
                 "quality": {},
                 "candidates": [],
                 "screened_candidates": [],
+                "_anchors": [],
                 "elapsed_seconds": round(perf_counter() - started, 3),
                 "error": str(error),
             }
@@ -146,6 +205,9 @@ def build_spherex_evidence_graph(
     blocked = sum(item["status"] == "COMPARISON NOT RELIABLE" for item in results)
     errors = sum(item["status"] == "ERROR" for item in results)
     candidate_count = sum(item["candidate_count"] for item in results)
+    consistency = _cross_band_consistency(results)
+    for result in results:
+        result.pop("_anchors", None)
     return {
         "suite": "PARALLAX X SPHEREx Evidence Graph",
         "mode": "real archive data",
@@ -158,8 +220,11 @@ def build_spherex_evidence_graph(
             "bands_error": errors,
             "total_candidates": candidate_count,
             "bands_with_candidates": sum(item["candidate_count"] > 0 for item in results),
+            "consistency_status": consistency["status"],
+            "matched_candidate_groups": len(consistency["matched_groups"]),
         },
         "bands": results,
+        "cross_band_consistency": consistency,
         "graph": {"nodes": nodes, "edges": edges},
         "limitations": [
             "Bands are analyzed independently; cross-band agreement is evidence context, not a discovery probability.",

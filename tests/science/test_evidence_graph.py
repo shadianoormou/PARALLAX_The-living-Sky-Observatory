@@ -33,6 +33,8 @@ def test_evidence_graph_preserves_each_band_and_null_result():
     assert all(item["epochs"] == ["D3-A", "D3-B"] for item in report["bands"])
     assert any(edge["relation"] == "measured" for edge in report["graph"]["edges"])
     assert any(node["type"] == "quality" for node in report["graph"]["nodes"])
+    assert report["summary"]["consistency_status"] == "MULTI-BAND CONSISTENT"
+    assert report["summary"]["matched_candidate_groups"] == 2
 
 
 def test_evidence_graph_keeps_archive_errors_visible():
@@ -44,3 +46,4 @@ def test_evidence_graph_keeps_archive_errors_visible():
     assert report["summary"]["bands_error"] == 2
     assert all(item["status"] == "ERROR" for item in report["bands"])
     assert len([node for node in report["graph"]["nodes"] if node["type"] == "error"]) == 2
+    assert report["cross_band_consistency"]["status"] == "NO PROMOTED CANDIDATES"
